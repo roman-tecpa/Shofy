@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FF2C2C2C</color>   <!-- Gris oscuro suave -->
+    <color name="purple_500">#FF121212</color>   <!-- Fondo negro profundo -->
+    <color name="purple_700">#FF000000</color>   <!-- Negro absoluto -->
+    <color name="teal_200">#FF64B5F6</color>     <!-- Azul claro tenue (acento) -->
+    <color name="teal_700">#FF81C784</color>     <!-- Verde pastel apagado (acento) -->
+    <color name="black">#FF000000</color>        <!-- Negro -->
+    <color name="white">#FFFFFFFF</color>        <!-- Blanco para textos -->
+    <color name="gray">#4CAF50</color>
+    <color name="red">#D32F2F</color>
+
+</resources>

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/mobile_navigation"
+    app:startDestination="@+id/nav_home">
+
+
+    <fragment
+        android:id="@+id/agregarProducto"
+        android:name="com.codedev.shofy.AgregarProducto"
+        android:label="Agregar producto" />
+
+    <fragment
+        android:id="@+id/listaProductos"
+        android:name="com.codedev.shofy.ListaProductos"
+        android:label="Lista de productos" />
+
+    <fragment
+        android:id="@+id/nav_home"
+        android:name="com.codedev.shofy.Home"
+        android:label="Tienda"
+        tools:layout="@layout/fragment_home" >
+        <action
+            android:id="@+id/action_nav_home_to_detalladoProducto"
+            app:destination="@id/detalladoProducto" />
+        <action
+            android:id="@+id/action_nav_home_to_carrito"
+            app:destination="@id/carrito" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/detalladoProducto"
+        android:name="com.codedev.shofy.DetalladoProducto"
+        android:label="Detalle Producto" >
+        <argument
+            android:name="nombre"
+            app:argType="string" />
+        <argument
+            android:name="descripcion"
+            app:argType="string" />
+        <argument
+            android:name="precio"
+            app:argType="float"
+            android:defaultValue="0.0" />
+        <argument
+            android:name="tipo"
+            app:argType="string" />
+        <action
+            android:id="@+id/action_detalladoProducto_to_carrito"
+            app:destination="@id/carrito" />
+        <action
+            android:id="@+id/action_detalladoProducto_to_nav_home"
+            app:destination="@id/nav_home" />
+    </fragment>
+    <fragment
+        android:id="@+id/carrito"
+        android:name="com.codedev.shofy.Carrito"
+        android:label="Carrito" >
+        <action
+            android:id="@+id/action_carrito_to_nav_home"
+            app:destination="@id/nav_home" />
+    </fragment>
+
+            <fragment
+        android:id="@+id/editarProducto"
+        android:name="com.codedev.shofy.models.EditarProducto"
+        android:label="Editar Producto" />
+
+
+</navigation>
