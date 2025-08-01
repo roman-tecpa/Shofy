@@ -56,4 +56,16 @@ public class CarritoManager {
         }
         return 0;
     }
+
+    public void actualizarCantidadProducto(Producto producto, int cantidadNueva) {
+        for (ItemCarrito item : items) {
+            if (item.getProducto().getId() == producto.getId()) {
+                item.setCantidad(cantidadNueva);
+                return;
+            }
+        }
+        // Si no existe, lo agregamos
+        items.add(new ItemCarrito(producto, cantidadNueva));
+    }
+
 }

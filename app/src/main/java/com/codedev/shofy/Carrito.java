@@ -61,6 +61,14 @@ public class Carrito extends Fragment {
     }
 
     private void realizarPedido(Context context, View view) {
+        int idUsuario = obtenerIdUsuario(); // Obtener el id del usuario (0 si no está logueado)
+
+        if (idUsuario == 0) {
+            // Usuario no ha iniciado sesión
+            Toast.makeText(context, "Debes iniciar sesión para proceder con la compra.", Toast.LENGTH_LONG).show();
+            return; // No continuar con la compra
+        }
+
         List<ItemCarrito> carritoItems = CarritoManager.getInstancia().getItems();
 
         if (carritoItems.isEmpty()) {
@@ -73,8 +81,6 @@ public class Carrito extends Fragment {
 
         db.beginTransaction();
         try {
-            int idUsuario = 1; // Temporal, hasta que se maneje autenticación
-
             // Insertar la venta
             ContentValues ventaValues = new ContentValues();
             ventaValues.put("id_usuario", idUsuario);
@@ -104,14 +110,14 @@ public class Carrito extends Fragment {
                 // Restar stock aquí solamente
                 db.execSQL("UPDATE Productos SET cantidad_actual = cantidad_actual - ? WHERE id = ?",
                         new Object[]{cantidad, producto.getId()});
-
-                DialogCompraRealizada dialog = new DialogCompraRealizada();
-                dialog.show(getParentFragmentManager(), "compra_realizada");
-
             }
 
             db.setTransactionSuccessful();
             Toast.makeText(context, "Venta registrada con éxito", Toast.LENGTH_SHORT).show();
+
+            // Mostrar diálogo de compra realizada (opcional)
+            DialogCompraRealizada dialog = new DialogCompraRealizada();
+            dialog.show(getParentFragmentManager(), "compra_realizada");
 
         } catch (Exception e) {
             Log.e("VENTA", "Error al registrar venta", e);
@@ -122,7 +128,7 @@ public class Carrito extends Fragment {
             db.close();
         }
 
-        // Limpiar carrito y volver a actualizar resumen
+        // Limpiar carrito y actualizar resumen
         CarritoManager.getInstancia().limpiarCarrito();
         if (adapter != null) adapter.notifyDataSetChanged();
         calcularYMostrarResumen(CarritoManager.getInstancia().getItems());
@@ -136,6 +142,13 @@ public class Carrito extends Fragment {
                 navController.getCurrentDestination().getId() != R.id.nav_home) {
             navController.navigate(R.id.nav_home, args);
         }
+    }
+
+    private int obtenerIdUsuario() {
+        // TODO: Aquí debes implementar la lógica real para obtener el id del usuario.
+        // Por ejemplo, leyendo SharedPreferences, base de datos, sesión, etc.
+        // Por ahora simulamos que no hay usuario logueado devolviendo 0
+        return 0;
     }
 
     private void calcularYMostrarResumen(List<ItemCarrito> items) {
