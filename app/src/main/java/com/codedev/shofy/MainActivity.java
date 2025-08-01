@@ -70,7 +70,21 @@ public class MainActivity extends AppCompatActivity {
                 .build();
 
         NavigationUI.setupActionBarWithNavController(this, navController, mAppBarConfiguration);
+        
         NavigationUI.setupWithNavController(navigationView, navController);
+        binding.navView.setNavigationItemSelectedListener(item -> {
+            boolean handled = false;
+            int itemId = item.getItemId();
+
+            if (navController.getCurrentDestination() == null ||
+                    navController.getCurrentDestination().getId() != itemId) {
+                navController.navigate(itemId);
+                handled = true;
+            }
+
+            binding.drawerLayout.closeDrawers();
+            return handled;
+        });
     }
 
     @Override

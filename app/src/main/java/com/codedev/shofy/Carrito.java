@@ -35,7 +35,6 @@ public class Carrito extends Fragment {
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_carrito, container, false);
 
-        // ✅ Inicialización de vistas
         recyclerCarrito = view.findViewById(R.id.recyclerCarrito);
         txtSubtotal = view.findViewById(R.id.txtSubtotal);
         txtIVA = view.findViewById(R.id.txtIVA);
@@ -44,43 +43,34 @@ public class Carrito extends Fragment {
 
         recyclerCarrito.setLayoutManager(new LinearLayoutManager(getContext()));
 
-        // ✅ Carga inicial del carrito
         List<ItemCarrito> items = CarritoManager.getInstancia().getItems();
-        adapter = new CarritoAdapter(items);
+
+        // Pasamos un Runnable para actualizar resumen cada vez que cambia el carrito
+        adapter = new CarritoAdapter(items, () -> calcularYMostrarResumen(CarritoManager.getInstancia().getItems()));
+
         recyclerCarrito.setAdapter(adapter);
 
         calcularYMostrarResumen(items);
 
-        // ✅ Acción de realizar pedido
         btnRealizarPedido.setOnClickListener(v -> {
             try {
                 Context context = v.getContext();
                 if (context == null) return;
-
-                // ✅ Mensaje de éxito
                 Toast.makeText(context, "Pedido realizado con éxito", Toast.LENGTH_SHORT).show();
-
-                // ✅ Limpieza del carrito
                 CarritoManager carrito = CarritoManager.getInstancia();
                 carrito.limpiarCarrito();
-
-                // ✅ Refresco de UI
                 if (adapter != null) {
                     adapter.notifyDataSetChanged();
                 }
-
-                // ✅ Recalcular resumen con carrito vacío
                 calcularYMostrarResumen(carrito.getItems());
 
-                // ✅ Preparar argumentos
                 Bundle args = new Bundle();
                 args.putBoolean("pedidoRealizado", true);
 
-                // ✅ Navegación segura a nav_home
                 NavController navController = Navigation.findNavController(v);
                 if (navController.getCurrentDestination() == null ||
                         navController.getCurrentDestination().getId() != R.id.nav_home) {
-                    navController.navigate(R.id.action_carrito_to_nav_home, args);
+                    navController.navigate(R.id.nav_home, args);
                 }
 
             } catch (Exception e) {
@@ -92,7 +82,6 @@ public class Carrito extends Fragment {
         return view;
     }
 
-    // ✅ Cálculo de resumen contable
     private void calcularYMostrarResumen(List<ItemCarrito> items) {
         double subtotal = 0;
         double ivaTotal = 0;
@@ -116,7 +105,6 @@ public class Carrito extends Fragment {
         txtTotal.setText(String.format("Total: $%.2f", total));
     }
 
-    // ✅ Lógica de IVA por tipo
     private double obtenerIVA(String tipo) {
         switch (tipo) {
             case "Papelería":
