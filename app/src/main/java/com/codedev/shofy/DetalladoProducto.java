@@ -13,6 +13,7 @@ import androidx.fragment.app.Fragment;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
 
+import com.codedev.shofy.DB.DBProductos;
 import com.codedev.shofy.models.Producto;
 import com.codedev.shofy.utils.CarritoManager;
 
@@ -22,16 +23,13 @@ public class DetalladoProducto extends Fragment {
     private int cantidadSeleccionada = 1;
     private int cantidadDisponible = 1;
 
-    public DetalladoProducto() {
-        // Constructor vacío requerido
-    }
+    public DetalladoProducto() {}
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
+    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_detallado_producto, container, false);
 
-        // Referencias de UI
+        // UI
         TextView txtNombre = view.findViewById(R.id.txtNombreDetalle);
         TextView txtDescripcion = view.findViewById(R.id.txtDescripcionDetalle);
         TextView txtPrecio = view.findViewById(R.id.txtPrecioDetalle);
@@ -43,7 +41,7 @@ public class DetalladoProducto extends Fragment {
         Button btnAgregarCarrito = view.findViewById(R.id.btnAgregarCarrito);
         Button btnRealizarCompra = view.findViewById(R.id.btnRealizarCompra);
 
-        // Obtener argumentos del producto
+        // Argumentos
         Bundle args = getArguments();
         if (args != null) {
             if (args.containsKey("producto")) {
@@ -61,13 +59,26 @@ public class DetalladoProducto extends Fragment {
             }
 
             if (producto != null) {
-                cantidadDisponible = Math.max(1, producto.getCantidad_actual());
+                cantidadDisponible = producto.getCantidad_actual();
+
                 txtNombre.setText(producto.getNombre());
                 txtDescripcion.setText(producto.getDescripcion());
                 txtPrecio.setText(String.format("$%.2f", producto.getPrecioBase()));
-                txtTotalUnidades.setText("Total Unidades: " + cantidadDisponible);
-                txtCantidad.setText(String.valueOf(cantidadSeleccionada));
                 imgTipo.setImageResource(obtenerIconoPorTipo(producto.getTipo()));
+
+                if (cantidadDisponible <= 0) {
+                    txtTotalUnidades.setText("Sin stock disponible");
+                    txtCantidad.setText("0");
+                    btnSumar.setEnabled(false);
+                    btnRestar.setEnabled(false);
+                    btnAgregarCarrito.setEnabled(false);
+                    btnRealizarCompra.setEnabled(false);
+
+                    Toast.makeText(getContext(), "Este producto ya no tiene unidades disponibles.", Toast.LENGTH_LONG).show();
+                } else {
+                    txtTotalUnidades.setText("Total Unidades: " + cantidadDisponible);
+                    txtCantidad.setText(String.valueOf(cantidadSeleccionada));
+                }
             } else {
                 Toast.makeText(getContext(), "Producto no encontrado", Toast.LENGTH_SHORT).show();
             }
@@ -92,29 +103,46 @@ public class DetalladoProducto extends Fragment {
         });
 
         // Botón 🛒 Agregar al carrito
+        // ... el resto del código arriba queda igual ...
+
+// Botón 🛒 Agregar al carrito
         btnAgregarCarrito.setOnClickListener(v -> {
             if (producto != null) {
-                CarritoManager.getInstancia().agregarProducto(producto, cantidadSeleccionada);
-                Toast.makeText(getContext(),
-                        "Agregado al carrito: " + cantidadSeleccionada + " unidad(es)",
-                        Toast.LENGTH_SHORT).show();
+                int cantidadYaEnCarrito = CarritoManager.getInstancia().obtenerCantidadDeProducto(producto);
+                int cantidadTotal = cantidadYaEnCarrito + cantidadSeleccionada;
+
+                if (cantidadTotal <= cantidadDisponible) {
+                    CarritoManager.getInstancia().agregarProducto(producto, cantidadSeleccionada);
+                    Toast.makeText(getContext(), "Agregado al carrito: " + cantidadSeleccionada + " unidad(es)", Toast.LENGTH_SHORT).show();
+                }else if(cantidadTotal == 0){
+                    Toast.makeText(getContext(), "Y no puedes agregar mas productos al carrito", Toast.LENGTH_SHORT).show();
+                }else {
+                    int restantes = cantidadDisponible - cantidadYaEnCarrito;
+                    Toast.makeText(getContext(), "Solo puedes agregar " + restantes + " unidad(es) más al carrito.", Toast.LENGTH_LONG).show();
+                }
             } else {
-                Toast.makeText(getContext(),
-                        "⚠ Error: producto no disponible",
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "⚠ Error: producto no disponible", Toast.LENGTH_SHORT).show();
             }
         });
 
-        // Botón 🧾 Realizar compra → navegar a carrito
+// Botón 🧾 Realizar compra (solo agrega al carrito y navega)
         btnRealizarCompra.setOnClickListener(v -> {
             try {
                 if (producto != null) {
-                    CarritoManager.getInstancia().agregarProducto(producto, cantidadSeleccionada);
+                    int cantidadYaEnCarrito = CarritoManager.getInstancia().obtenerCantidadDeProducto(producto);
+                    int cantidadTotal = cantidadYaEnCarrito + cantidadSeleccionada;
 
-                    NavController navController = Navigation.findNavController(v);
-                    if (navController.getCurrentDestination() == null ||
-                            navController.getCurrentDestination().getId() != R.id.carrito) {
-                        navController.navigate(R.id.action_detalladoProducto_to_carrito);
+                    if (cantidadTotal <= producto.getCantidad_actual()) {
+                        CarritoManager.getInstancia().agregarProducto(producto, cantidadSeleccionada);
+
+                        NavController navController = Navigation.findNavController(v);
+                        if (navController.getCurrentDestination() == null ||
+                                navController.getCurrentDestination().getId() != R.id.carrito) {
+                            navController.navigate(R.id.action_detalladoProducto_to_carrito);
+                        }
+                    } else {
+                        int restantes = producto.getCantidad_actual() - cantidadYaEnCarrito;
+                        Toast.makeText(getContext(), "Solo puedes agregar " + restantes + " unidad(es) más para no superar el stock.", Toast.LENGTH_LONG).show();
                     }
                 } else {
                     Toast.makeText(getContext(), "Producto no disponible", Toast.LENGTH_SHORT).show();
@@ -123,6 +151,7 @@ public class DetalladoProducto extends Fragment {
                 Toast.makeText(getContext(), "Error al navegar al carrito", Toast.LENGTH_SHORT).show();
             }
         });
+
 
         return view;
     }

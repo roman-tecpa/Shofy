@@ -24,7 +24,6 @@ public class DBHelper extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-
         // Tabla de usuarios
         db.execSQL("CREATE TABLE Usuarios (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
@@ -38,13 +37,13 @@ public class DBHelper extends SQLiteOpenHelper {
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "nombre TEXT UNIQUE NOT NULL, " +
                 "descripcion TEXT NOT NULL, " +
-                "tipo TEXT NOT NULL, " +  // 'papelería', 'supermercado', 'droguería'
+                "tipo TEXT NOT NULL, " +
                 "cantidad_actual INTEGER DEFAULT 0, " +
                 "cantidad_minima INTEGER NOT NULL, " +
                 "precio_base REAL NOT NULL" +
                 ")");
 
-        // Tabla de ventas (encabezado), ahora relacionada al usuario
+        // Tabla de ventas
         db.execSQL("CREATE TABLE Ventas (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "id_usuario INTEGER NOT NULL, " +

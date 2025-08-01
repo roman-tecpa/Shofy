@@ -86,7 +86,8 @@ public class DBProductos extends DBHelper {
 
         return lista;
     }
-        public boolean actualizarProducto(int id, String nombre, String descripcion, String tipo,
+
+    public boolean actualizarProducto(int id, String nombre, String descripcion, String tipo,
                                       int cantidadActual, int cantidadMinima, double precioBase) {
         SQLiteDatabase db = getWritableDatabase();
         ContentValues values = new ContentValues();
@@ -102,4 +103,14 @@ public class DBProductos extends DBHelper {
         return rows > 0;
     }
 
+    // ✅ NUEVO MÉTODO: Actualizar solo el stock actual de un producto
+    public boolean actualizarStockProducto(int idProducto, int nuevoStock) {
+        SQLiteDatabase db = getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put("cantidad_actual", nuevoStock);
+
+        int filas = db.update("Productos", values, "id = ?", new String[]{String.valueOf(idProducto)});
+        db.close();
+        return filas > 0;
+    }
 }

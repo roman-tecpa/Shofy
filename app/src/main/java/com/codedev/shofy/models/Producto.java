@@ -31,4 +31,9 @@ public class Producto implements Serializable {
     public double getPrecioBase() { return precioBase; }
 
     public void setNombre(String nombre) { this.nombre = nombre; }
+
+    // ✅ NUEVO: Permite actualizar el stock internamente
+    public void setCantidad_actual(int cantidad_actual) {
+        this.cantidad_actual = cantidad_actual;
+    }
 }

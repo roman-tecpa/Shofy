@@ -5,6 +5,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -24,7 +25,6 @@ public class CarritoAdapter extends RecyclerView.Adapter<CarritoAdapter.ViewHold
         this.carrito = carrito;
         this.calcularResumen = calcularResumen;
     }
-
 
     @NonNull
     @Override
@@ -54,28 +54,27 @@ public class CarritoAdapter extends RecyclerView.Adapter<CarritoAdapter.ViewHold
             }
         });
 
-        // Botón Sumar
+        // Botón Sumar con validación de stock
         holder.btnSumar.setOnClickListener(v -> {
-            item.setCantidad(item.getCantidad() + 1);
-            notifyItemChanged(position);
-            calcularResumen.run();
+            int cantidadActual = item.getCantidad();
+            int stockDisponible = producto.getCantidad_actual();
+
+            if (cantidadActual < stockDisponible) {
+                item.setCantidad(cantidadActual + 1);
+                notifyItemChanged(position);
+                calcularResumen.run();
+            } else {
+                Toast.makeText(holder.itemView.getContext(), "No hay más stock disponible", Toast.LENGTH_SHORT).show();
+            }
         });
 
         // Botón Eliminar
-        holder.btnEliminar.setOnClickListener(v -> {
-            carrito.remove(position);
-            notifyItemRemoved(position);
-            notifyItemRangeChanged(position, carrito.size());
-            calcularResumen.run();
-        });
-
         holder.btnEliminar.setOnClickListener(v -> {
             carrito.remove(position);  // Eliminar el item de la lista
             notifyItemRemoved(position);  // Notificar eliminación al RecyclerView
             notifyItemRangeChanged(position, carrito.size());  // Actualizar rango visual
             calcularResumen.run();  // Actualizar resumen en el fragmento
         });
-
     }
 
     @Override

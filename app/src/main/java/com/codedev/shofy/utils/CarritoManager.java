@@ -46,4 +46,14 @@ public class CarritoManager {
     public void limpiarCarrito() {
         items.clear();
     }
+
+    // 🔍 NUEVO: Obtener la cantidad que ya hay en el carrito de este producto
+    public int obtenerCantidadDeProducto(Producto producto) {
+        for (ItemCarrito item : items) {
+            if (item.getProducto().getId() == producto.getId()) {
+                return item.getCantidad();
+            }
+        }
+        return 0;
+    }
 }

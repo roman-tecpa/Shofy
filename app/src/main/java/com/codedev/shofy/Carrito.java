@@ -1,6 +1,8 @@
 package com.codedev.shofy;
 
+import android.content.ContentValues;
 import android.content.Context;
+import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -17,8 +19,11 @@ import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.codedev.shofy.DB.DBHelper;
 import com.codedev.shofy.adapters.CarritoAdapter;
+import com.codedev.shofy.models.DialogCompraRealizada;
 import com.codedev.shofy.models.ItemCarrito;
+import com.codedev.shofy.models.Producto;
 import com.codedev.shofy.utils.CarritoManager;
 
 import java.util.List;
@@ -45,41 +50,92 @@ public class Carrito extends Fragment {
 
         List<ItemCarrito> items = CarritoManager.getInstancia().getItems();
 
-        // Pasamos un Runnable para actualizar resumen cada vez que cambia el carrito
         adapter = new CarritoAdapter(items, () -> calcularYMostrarResumen(CarritoManager.getInstancia().getItems()));
-
         recyclerCarrito.setAdapter(adapter);
 
         calcularYMostrarResumen(items);
 
-        btnRealizarPedido.setOnClickListener(v -> {
-            try {
-                Context context = v.getContext();
-                if (context == null) return;
-                Toast.makeText(context, "Pedido realizado con éxito", Toast.LENGTH_SHORT).show();
-                CarritoManager carrito = CarritoManager.getInstancia();
-                carrito.limpiarCarrito();
-                if (adapter != null) {
-                    adapter.notifyDataSetChanged();
-                }
-                calcularYMostrarResumen(carrito.getItems());
-
-                Bundle args = new Bundle();
-                args.putBoolean("pedidoRealizado", true);
-
-                NavController navController = Navigation.findNavController(v);
-                if (navController.getCurrentDestination() == null ||
-                        navController.getCurrentDestination().getId() != R.id.nav_home) {
-                    navController.navigate(R.id.nav_home, args);
-                }
-
-            } catch (Exception e) {
-                Log.e("REALIZAR_PEDIDO", "Error al realizar pedido", e);
-                Toast.makeText(v.getContext(), "Error al realizar el pedido", Toast.LENGTH_SHORT).show();
-            }
-        });
+        btnRealizarPedido.setOnClickListener(v -> realizarPedido(v.getContext(), v));
 
         return view;
+    }
+
+    private void realizarPedido(Context context, View view) {
+        List<ItemCarrito> carritoItems = CarritoManager.getInstancia().getItems();
+
+        if (carritoItems.isEmpty()) {
+            Toast.makeText(context, "El carrito está vacío", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        DBHelper dbHelper = new DBHelper(context);
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+
+        db.beginTransaction();
+        try {
+            int idUsuario = 1; // Temporal, hasta que se maneje autenticación
+
+            // Insertar la venta
+            ContentValues ventaValues = new ContentValues();
+            ventaValues.put("id_usuario", idUsuario);
+            long idVenta = db.insert("Ventas", null, ventaValues);
+
+            if (idVenta == -1) throw new Exception("No se pudo registrar la venta");
+
+            for (ItemCarrito item : carritoItems) {
+                Producto producto = item.getProducto();
+                int cantidad = item.getCantidad();
+
+                if (cantidad > producto.getCantidad_actual()) {
+                    throw new Exception("La cantidad de " + producto.getNombre() + " supera el stock disponible.");
+                }
+
+                double precioUnitarioConIVA = producto.getPrecioBase() * (1 + obtenerIVA(producto.getTipo()));
+
+                ContentValues detalle = new ContentValues();
+                detalle.put("id_venta", idVenta);
+                detalle.put("id_producto", producto.getId());
+                detalle.put("cantidad_vendida", cantidad);
+                detalle.put("precio_venta", precioUnitarioConIVA);
+                long idDetalle = db.insert("DetalleVentas", null, detalle);
+
+                if (idDetalle == -1) throw new Exception("No se pudo registrar el detalle de venta");
+
+                // Restar stock aquí solamente
+                db.execSQL("UPDATE Productos SET cantidad_actual = cantidad_actual - ? WHERE id = ?",
+                        new Object[]{cantidad, producto.getId()});
+
+                DialogCompraRealizada dialog = new DialogCompraRealizada();
+                dialog.show(getParentFragmentManager(), "compra_realizada");
+
+            }
+
+            db.setTransactionSuccessful();
+            Toast.makeText(context, "Venta registrada con éxito", Toast.LENGTH_SHORT).show();
+
+        } catch (Exception e) {
+            Log.e("VENTA", "Error al registrar venta", e);
+            Toast.makeText(context, "Error al registrar la venta: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            return;
+        } finally {
+            db.endTransaction();
+            db.close();
+        }
+
+        // Limpiar carrito y volver a actualizar resumen
+        CarritoManager.getInstancia().limpiarCarrito();
+        if (adapter != null) adapter.notifyDataSetChanged();
+        calcularYMostrarResumen(CarritoManager.getInstancia().getItems());
+
+        // Regresar al Home
+        Bundle args = new Bundle();
+        args.putBoolean("pedidoRealizado", true);
+
+        NavController navController = Navigation.findNavController(view);
+        if (navController.getCurrentDestination() == null ||
+                navController.getCurrentDestination().getId() != R.id.nav_home) {
+            navController.navigate(R.id.nav_home, args);
+        }
     }
 
     private void calcularYMostrarResumen(List<ItemCarrito> items) {
@@ -90,9 +146,7 @@ public class Carrito extends Fragment {
             double precioUnit = item.getProducto().getPrecioBase();
             int cantidad = item.getCantidad();
             double subtotalItem = precioUnit * cantidad;
-
-            double ivaPorcentaje = obtenerIVA(item.getProducto().getTipo());
-            double ivaItem = subtotalItem * ivaPorcentaje;
+            double ivaItem = subtotalItem * obtenerIVA(item.getProducto().getTipo());
 
             subtotal += subtotalItem;
             ivaTotal += ivaItem;
