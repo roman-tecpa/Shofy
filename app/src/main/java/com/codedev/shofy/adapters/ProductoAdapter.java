@@ -93,6 +93,8 @@ public class ProductoAdapter extends RecyclerView.Adapter<ProductoAdapter.ViewHo
                     dialog.dismiss();
                 });
 
+
+
                 dialog.show();
             }
         });
@@ -118,5 +120,11 @@ public class ProductoAdapter extends RecyclerView.Adapter<ProductoAdapter.ViewHo
             btnEditar = itemView.findViewById(R.id.btnEditar);
             btnEliminar = itemView.findViewById(R.id.btnEliminar);
         }
+    }
+
+    public void actualizarLista(ArrayList<Producto> nuevaLista) {
+        this.listaProductos.clear();
+        this.listaProductos.addAll(nuevaLista);
+        notifyDataSetChanged();
     }
 }

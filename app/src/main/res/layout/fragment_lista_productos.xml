@@ -4,12 +4,21 @@
     android:layout_height="match_parent"
     android:background="#F2F2F2">
 
+    <EditText
+        android:id="@+id/editBuscarProducto"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="8dp"
+        android:hint="Buscar producto"
+        android:background="@android:drawable/edit_text"
+        android:padding="10dp"
+        android:inputType="text"
+        android:layout_alignParentTop="true" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerProductos"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_below="@id/editBuscarProducto"
         android:padding="8dp" />
 </RelativeLayout>
-
-
-
