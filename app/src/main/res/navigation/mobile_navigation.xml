@@ -53,6 +53,7 @@
             android:id="@+id/action_detalladoProducto_to_nav_home"
             app:destination="@id/nav_home" />
     </fragment>
+
     <fragment
         android:id="@+id/carrito"
         android:name="com.codedev.shofy.Carrito"
@@ -62,10 +63,21 @@
             app:destination="@id/nav_home" />
     </fragment>
 
-            <fragment
+    <fragment
         android:id="@+id/editarProducto"
         android:name="com.codedev.shofy.models.EditarProducto"
         android:label="Editar Producto" />
+
+    <fragment
+        android:id="@+id/registro"
+        android:name="com.codedev.shofy.Registro"
+        android:label="Registro" />
+
+    <fragment
+        android:id="@+id/login"
+        android:name="com.codedev.shofy.Login"
+        android:label="Login"
+        tools:layout="@layout/fragment_login" />
 
 
 </navigation>

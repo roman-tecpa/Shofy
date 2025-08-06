@@ -1,6 +1,7 @@
 package com.codedev.shofy.DB;
 
 import android.content.Context;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
@@ -25,12 +26,19 @@ public class DBHelper extends SQLiteOpenHelper {
     @Override
     public void onCreate(SQLiteDatabase db) {
         // Tabla de usuarios
+        // Tabla de usuarios con rol
         db.execSQL("CREATE TABLE Usuarios (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "nombre TEXT NOT NULL, " +
                 "correo TEXT UNIQUE NOT NULL, " +
-                "contrasena TEXT NOT NULL" +
+                "contrasena TEXT NOT NULL, " +
+                "rol TEXT NOT NULL" +  // <- NUEVO CAMPO
                 ")");
+
+        db.execSQL("INSERT INTO Usuarios (nombre, correo, contrasena, rol) VALUES " +
+                "('Admin', 'admin@admin.com', 'admin123', 'admin')");
+
+
 
         // Tabla de productos
         db.execSQL("CREATE TABLE Productos (" +
@@ -57,7 +65,7 @@ public class DBHelper extends SQLiteOpenHelper {
                 "id_venta INTEGER NOT NULL, " +
                 "id_producto INTEGER NOT NULL, " +
                 "cantidad_vendida INTEGER NOT NULL, " +
-                "precio_venta REAL NOT NULL, " + // Precio unitario con IVA
+                "precio_venta REAL NOT NULL, " +
                 "FOREIGN KEY(id_venta) REFERENCES Ventas(id), " +
                 "FOREIGN KEY(id_producto) REFERENCES Productos(id)" +
                 ")");
@@ -78,5 +86,53 @@ public class DBHelper extends SQLiteOpenHelper {
         db.execSQL("DROP TABLE IF EXISTS Productos");
         db.execSQL("DROP TABLE IF EXISTS Usuarios");
         onCreate(db);
+
+    }
+
+    public int validarUsuario(String correo, String contrasena) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        int idUsuario = 0;
+        Cursor cursor = db.rawQuery("SELECT id FROM Usuarios WHERE correo = ? AND contrasena = ?",
+                new String[]{correo, contrasena});
+        if (cursor.moveToFirst()) {
+            idUsuario = cursor.getInt(0);
+        }
+        cursor.close();
+        db.close();
+        return idUsuario;
+    }
+    public boolean esAdmin(int idUsuario) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        boolean admin = false;
+        Cursor cursor = db.rawQuery("SELECT rol FROM Usuarios WHERE id = ?",
+                new String[]{String.valueOf(idUsuario)});
+        if (cursor.moveToFirst()) {
+            String rol = cursor.getString(0);
+            admin = rol.equalsIgnoreCase("admin");
+        }
+        cursor.close();
+        db.close();
+        return admin;
+    }
+    public String obtenerNombreUsuario(int idUsuario) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        String nombre = "";
+        Cursor cursor = db.rawQuery("SELECT nombre FROM Usuarios WHERE id = ?",
+                new String[]{String.valueOf(idUsuario)});
+        if (cursor.moveToFirst()) {
+            nombre = cursor.getString(0);
+        }
+        cursor.close();
+        db.close();
+        return nombre;
+    }
+
+    public boolean correoExiste(String correo) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT id FROM Usuarios WHERE correo = ?", new String[]{correo});
+        boolean existe = cursor.moveToFirst();
+        cursor.close();
+        db.close();
+        return existe;
     }
 }

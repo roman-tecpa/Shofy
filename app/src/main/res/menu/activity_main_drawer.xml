@@ -23,5 +23,11 @@
             android:id="@+id/carrito"
             android:icon="@drawable/ic_carrito"
             android:title="Carrito" />
+
+        <item
+            android:id="@+id/nav_logout"
+            android:title="Cerrar sesión"
+            android:icon="@android:drawable/ic_lock_power_off" />
+
     </group>
 </menu>

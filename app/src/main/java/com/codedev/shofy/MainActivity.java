@@ -1,22 +1,24 @@
 package com.codedev.shofy;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.View;
 import android.view.Menu;
+import android.view.View;
 import android.widget.Toast;
 
 import com.codedev.shofy.DB.DBHelper;
-import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.navigation.NavigationView;
+import com.google.android.material.snackbar.Snackbar;
 
+import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.appcompat.app.AppCompatActivity;
 import androidx.navigation.NavController;
 import androidx.navigation.fragment.NavHostFragment;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
-import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.appcompat.app.AppCompatActivity;
 
 import com.codedev.shofy.databinding.ActivityMainBinding;
 
@@ -35,7 +37,7 @@ public class MainActivity extends AppCompatActivity {
 
         setSupportActionBar(binding.appBarMain.toolbar);
 
-        // ✅ Obtener NavController desde NavHostFragment
+        // Obtener NavController desde NavHostFragment
         NavHostFragment navHostFragment = (NavHostFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.nav_host_fragment_content_main);
         if (navHostFragment != null) {
@@ -45,7 +47,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // ✅ FAB: navegación segura al carrito
+        // FAB para ir al carrito
         binding.appBarMain.fab.setOnClickListener(view -> {
             try {
                 if (navController.getCurrentDestination() == null ||
@@ -60,7 +62,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        // ✅ Configuración de NavigationView y Drawer
+        // Configuración del drawer y nav view
         DrawerLayout drawer = binding.drawerLayout;
         NavigationView navigationView = binding.navView;
 
@@ -70,20 +72,51 @@ public class MainActivity extends AppCompatActivity {
                 .build();
 
         NavigationUI.setupActionBarWithNavController(this, navController, mAppBarConfiguration);
-        
         NavigationUI.setupWithNavController(navigationView, navController);
+
+        // ✅ Lógica para detectar clic en "Cerrar sesión"
         binding.navView.setNavigationItemSelectedListener(item -> {
-            boolean handled = false;
             int itemId = item.getItemId();
 
+            if (itemId == R.id.nav_logout) {
+                // Borrar sesión
+                SharedPreferences preferences = getSharedPreferences("sesion", Context.MODE_PRIVATE);
+                preferences.edit().clear().apply();
+
+                Toast.makeText(this, "Sesión cerrada", Toast.LENGTH_SHORT).show();
+
+                // Ir al login
+                if (navController.getCurrentDestination() == null ||
+                        navController.getCurrentDestination().getId() != R.id.login) {
+                    navController.navigate(R.id.login);
+                }
+
+                binding.drawerLayout.closeDrawers();
+                return true;
+            }
+
+            // Navegación normal
             if (navController.getCurrentDestination() == null ||
                     navController.getCurrentDestination().getId() != itemId) {
                 navController.navigate(itemId);
-                handled = true;
             }
 
             binding.drawerLayout.closeDrawers();
-            return handled;
+            return true;
+        });
+
+        // ✅ Ocultar Toolbar y FAB en login y registro
+        navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
+            int id = destination.getId();
+            boolean ocultarUI = (id == R.id.login || id == R.id.registro);
+
+            if (ocultarUI) {
+                binding.appBarMain.toolbar.setVisibility(View.GONE);
+                binding.appBarMain.fab.setVisibility(View.GONE);
+            } else {
+                binding.appBarMain.toolbar.setVisibility(View.VISIBLE);
+                binding.appBarMain.fab.setVisibility(View.VISIBLE);
+            }
         });
     }
 

@@ -2,6 +2,7 @@ package com.codedev.shofy;
 
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
 import android.util.Log;
@@ -66,8 +67,13 @@ public class Carrito extends Fragment {
         if (idUsuario == 0) {
             // Usuario no ha iniciado sesión
             Toast.makeText(context, "Debes iniciar sesión para proceder con la compra.", Toast.LENGTH_LONG).show();
+
+            NavController navController = Navigation.findNavController(view);
+            navController.navigate(R.id.login); // ← este es el ID de tu fragmento de login
+
             return; // No continuar con la compra
         }
+
 
         List<ItemCarrito> carritoItems = CarritoManager.getInstancia().getItems();
 
@@ -145,11 +151,13 @@ public class Carrito extends Fragment {
     }
 
     private int obtenerIdUsuario() {
-        // TODO: Aquí debes implementar la lógica real para obtener el id del usuario.
-        // Por ejemplo, leyendo SharedPreferences, base de datos, sesión, etc.
-        // Por ahora simulamos que no hay usuario logueado devolviendo 0
-        return 0;
+        Context context = getContext();
+        if (context == null) return 0;
+
+        SharedPreferences preferences = context.getSharedPreferences("sesion", Context.MODE_PRIVATE);
+        return preferences.getInt("idUsuario", 0); // Devuelve 0 si no hay sesión
     }
+
 
     private void calcularYMostrarResumen(List<ItemCarrito> items) {
         double subtotal = 0;
