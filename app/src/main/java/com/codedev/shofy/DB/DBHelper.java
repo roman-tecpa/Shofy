@@ -10,7 +10,7 @@ import androidx.annotation.Nullable;
 public class DBHelper extends SQLiteOpenHelper {
 
     public static final String DB_NAME = "shofy.db";
-    public static final int DB_VERSION = 2; // Incrementado por los nuevos cambios
+    public static final int DB_VERSION = 3; // Incrementado por los nuevos cambios
 
     public DBHelper(@Nullable Context context) {
         super(context, DB_NAME, null, DB_VERSION);
@@ -52,12 +52,15 @@ public class DBHelper extends SQLiteOpenHelper {
                 ")");
 
         // Tabla de ventas
+        // Tabla de ventas
         db.execSQL("CREATE TABLE Ventas (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "id_usuario INTEGER NOT NULL, " +
+                "direccion_envio TEXT, " +  // 👈 Agregado
                 "fecha_venta DATETIME DEFAULT CURRENT_TIMESTAMP, " +
                 "FOREIGN KEY(id_usuario) REFERENCES Usuarios(id)" +
                 ")");
+
 
         // Tabla de detalle de ventas
         db.execSQL("CREATE TABLE DetalleVentas (" +

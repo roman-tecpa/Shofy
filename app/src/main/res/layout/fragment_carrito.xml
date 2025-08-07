@@ -53,9 +53,37 @@
             android:layout_height="wrap_content"
             android:text="Total: $0.00"
             android:textSize="18sp"
-            android:textStyle="bold" />
+            android:textStyle="bold"
+            android:paddingBottom="12dp" />
     </LinearLayout>
 
+    <!-- Dirección de envío -->
+    <LinearLayout
+        android:id="@+id/layoutDireccionEnvio"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp"
+        android:background="#EEEEEE"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:id="@+id/txtDireccionEnvio"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Dirección de envío: No agregada"
+            android:textSize="16sp"
+            android:paddingBottom="8dp" />
+
+        <Button
+            android:id="@+id/btnEditarDireccion"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Agregar / Editar dirección"
+            android:textAllCaps="false" />
+    </LinearLayout>
+
+    <!-- Botón para realizar pedido -->
     <Button
         android:id="@+id/btnRealizarPedido"
         android:layout_width="match_parent"
