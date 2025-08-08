@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/layoutCarrito"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp">
+    android:padding="16dp"
+    android:background="#F5F7FB">
 
+    <!-- Título -->
     <TextView
         android:id="@+id/txtTituloCarrito"
         android:layout_width="match_parent"
@@ -13,81 +16,113 @@
         android:text="🛒 Tu carrito de compras"
         android:textSize="20sp"
         android:textStyle="bold"
+        android:textColor="#111827"
         android:gravity="center"
         android:paddingBottom="12dp" />
 
+    <!-- Lista -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerCarrito"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="8dp" />
 
-    <!-- Contenedor resumen -->
-    <LinearLayout
-        android:id="@+id/layoutResumen"
+    <!-- Resumen en tarjeta -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardResumen"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:paddingTop="16dp"
-        android:paddingBottom="16dp">
+        android:layout_marginTop="8dp"
+        app:cardUseCompatPadding="true"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="4dp">
 
-        <TextView
-            android:id="@+id/txtSubtotal"
+        <LinearLayout
+            android:id="@+id/layoutResumen"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Subtotal: $0.00"
-            android:textSize="16sp"
-            android:paddingBottom="4dp" />
+            android:orientation="vertical"
+            android:padding="16dp">
 
-        <TextView
-            android:id="@+id/txtIVA"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="IVA: $0.00"
-            android:textSize="16sp"
-            android:paddingBottom="4dp" />
+            <TextView
+                android:id="@+id/txtSubtotal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Subtotal: $0.00"
+                android:textSize="16sp"
+                android:textColor="#374151"
+                android:paddingBottom="4dp" />
 
-        <TextView
-            android:id="@+id/txtTotal"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Total: $0.00"
-            android:textSize="18sp"
-            android:textStyle="bold"
-            android:paddingBottom="12dp" />
-    </LinearLayout>
+            <TextView
+                android:id="@+id/txtIVA"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="IVA: $0.00"
+                android:textSize="16sp"
+                android:textColor="#374151"
+                android:paddingBottom="4dp" />
 
-    <!-- Dirección de envío -->
-    <LinearLayout
-        android:id="@+id/layoutDireccionEnvio"
+            <TextView
+                android:id="@+id/txtTotal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Total: $0.00"
+                android:textSize="18sp"
+                android:textStyle="bold"
+                android:textColor="#111827" />
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- Dirección de envío en tarjeta -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/cardDireccion"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="12dp"
-        android:background="#EEEEEE"
-        android:layout_marginBottom="12dp">
+        android:layout_marginTop="12dp"
+        app:cardUseCompatPadding="true"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="4dp">
 
-        <TextView
-            android:id="@+id/txtDireccionEnvio"
+        <LinearLayout
+            android:id="@+id/layoutDireccionEnvio"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Dirección de envío: No agregada"
-            android:textSize="16sp"
-            android:paddingBottom="8dp" />
+            android:orientation="vertical"
+            android:padding="16dp">
 
-        <Button
-            android:id="@+id/btnEditarDireccion"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="Agregar / Editar dirección"
-            android:textAllCaps="false" />
-    </LinearLayout>
+            <TextView
+                android:id="@+id/txtDireccionEnvio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Dirección de envío: No agregada"
+                android:textSize="16sp"
+                android:textColor="#111827"
+                android:paddingBottom="8dp" />
 
-    <!-- Botón para realizar pedido -->
+            <Button
+                android:id="@+id/btnEditarDireccion"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Agregar / Editar dirección"
+                android:textAllCaps="false"
+                android:background="@drawable/bg_btn_secondary"
+                android:textColor="#FFFFFF"
+                android:paddingHorizontal="16dp"
+                android:paddingVertical="10dp" />
+        </LinearLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- Botón principal -->
     <Button
         android:id="@+id/btnRealizarPedido"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="48dp"
+        android:layout_marginTop="12dp"
         android:text="Realizar pedido"
-        android:textAllCaps="false" />
+        android:textAllCaps="false"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/bg_btn_primary" />
+
 </LinearLayout>
