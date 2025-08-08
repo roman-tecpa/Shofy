@@ -1,5 +1,7 @@
 package com.codedev.shofy;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -163,4 +165,15 @@ public class DetalladoProducto extends Fragment {
             default: return R.drawable.ic_default;
         }
     }
+
+    private boolean isAdminLoggedIn(Context ctx) {
+        SharedPreferences sp = ctx.getSharedPreferences("sesion", Context.MODE_PRIVATE);
+        String correo = sp.getString("correo", null);
+        if (correo == null) return false;
+
+        com.codedev.shofy.DB.DBHelper dbh = new com.codedev.shofy.DB.DBHelper(ctx);
+        int id = dbh.obtenerIdUsuarioPorCorreo(correo);
+        return id != 0 && dbh.esAdmin(id);
+    }
+
 }

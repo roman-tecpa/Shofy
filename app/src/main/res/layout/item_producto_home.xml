@@ -8,49 +8,53 @@
     app:cardElevation="6dp"
     app:cardUseCompatPadding="true">
 
-    <LinearLayout
-        android:orientation="vertical"
-        android:padding="12dp"
-        android:gravity="center"
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <!-- Imagen del producto -->
-        <ImageView
-            android:id="@+id/imgProducto"
-            android:layout_width="100dp"
-            android:layout_height="100dp"
-            android:scaleType="centerCrop"
-            android:background="@drawable/bg_card"
-            android:contentDescription="Imagen del producto" />
-
-        <!-- Nombre del producto -->
-        <TextView
-            android:id="@+id/txtNombre"
-            android:text="Nombre del producto"
-            android:textStyle="bold"
-            android:textSize="16sp"
-            android:textColor="#111827"
+        <!-- Contenido de la tarjeta -->
+        <LinearLayout
+            android:orientation="vertical"
+            android:padding="12dp"
             android:gravity="center"
-            android:layout_marginTop="8dp"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
 
-        <!-- Precio -->
-        <TextView
-            android:id="@+id/txtPrecio"
-            android:text="$0.00"
-            android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="#065F46"
-            android:background="@drawable/bg_dialog"
-            android:paddingLeft="10dp"
-            android:paddingRight="10dp"
-            android:paddingTop="4dp"
-            android:paddingBottom="4dp"
-            android:layout_marginTop="4dp"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content" />
+            <ImageView
+                android:id="@+id/imgProducto"
+                android:layout_width="100dp"
+                android:layout_height="100dp"
+                android:scaleType="centerCrop"
+                android:background="@drawable/bg_card"
+                android:contentDescription="Imagen del producto" />
 
-    </LinearLayout>
+            <TextView
+                android:id="@+id/txtNombre"
+                android:text="Nombre del producto"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:textColor="#111827"
+                android:gravity="center"
+                android:layout_marginTop="8dp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <TextView
+                android:id="@+id/txtPrecio"
+                android:text="$0.00"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:textColor="#065F46"
+                android:background="@drawable/bg_dialog"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:layout_marginTop="4dp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+        </LinearLayout>
+
+    </FrameLayout>
 </androidx.cardview.widget.CardView>

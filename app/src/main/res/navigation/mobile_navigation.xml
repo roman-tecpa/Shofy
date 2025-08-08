@@ -82,6 +82,15 @@
         android:id="@+id/comprasAdmin"
         android:name="com.codedev.shofy.ComprasAdmin"
         android:label="ComprasAdmin" />
+    <fragment
+        android:id="@+id/alertasAdmin"
+        android:name="com.codedev.shofy.AlertasAdmin"
+        android:label="Notificaciones" />
+    <fragment
+        android:id="@+id/dashboardKpiFragment"
+        android:name="com.codedev.shofy.DashboardKpiFragment"
+        android:label="fragment_dashboard_kpi"
+        tools:layout="@layout/fragment_dashboard_kpi" />
 
 
 </navigation>

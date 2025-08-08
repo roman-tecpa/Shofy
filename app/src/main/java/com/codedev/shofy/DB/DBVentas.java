@@ -2,6 +2,7 @@ package com.codedev.shofy.DB;
 
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 
@@ -9,6 +10,7 @@ import com.codedev.shofy.models.CompraDetalle;
 import com.codedev.shofy.models.CompraResumen;
 import com.codedev.shofy.models.ItemCarrito;
 import com.codedev.shofy.models.Producto;
+import com.codedev.shofy.utils.NotificationUtils; // ✅ NEW
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,9 +53,11 @@ public class DBVentas extends DBHelper {
                     d.put("precio_venta", precioUnitFinal);
                     db.insertOrThrow("DetalleVentas", null, d);
 
-                    // (Opcional) actualizar stock:
-                    // db.execSQL("UPDATE Productos SET cantidad_actual = cantidad_actual - ? WHERE id = ?",
-                    //        new Object[]{cantidad, idProducto});
+                    // ✅ DESCONTAR STOCK dentro de la MISMA transacción
+                    db.execSQL("UPDATE Productos " +
+                                    "SET cantidad_actual = cantidad_actual - ? " +
+                                    "WHERE id = ?",
+                            new Object[]{cantidad, idProducto});
                 }
             }
 
@@ -65,6 +69,29 @@ public class DBVentas extends DBHelper {
             db.endTransaction();
             db.close();
         }
+
+        // ✅ POST-COMMIT: notificar SOLO productos de esta venta que quedaron <= mínimo
+        // POST-COMMIT
+        try {
+            if (idVenta != -1 && isAdminLoggedIn(context) && items != null) {
+                DBProductos dbp = new DBProductos(context);
+                java.util.HashSet<Integer> ids = new java.util.HashSet<>();
+                for (ItemCarrito it : items) {
+                    if (it != null && it.getProducto() != null) ids.add(it.getProducto().getId());
+                }
+                for (Integer idProd : ids) {
+                    if (dbp.productoEstaBajoMinimo(idProd)) {
+                        Producto p = dbp.getProductoById(idProd);
+                        if (p != null) com.codedev.shofy.utils.NotificationUtils.notifyLowStockSingle(context, p); // 👈
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+
+
         return idVenta;
     }
 
@@ -165,8 +192,18 @@ public class DBVentas extends DBHelper {
             }
             cProd.close();
         }
-
         db.close();
         return detalle;
+    }
+
+    // ===== Helper: ¿hay admin logueado? =====
+    private boolean isAdminLoggedIn(Context ctx) {
+        SharedPreferences sp = ctx.getSharedPreferences("sesion", Context.MODE_PRIVATE);
+        String correo = sp.getString("correo", null);
+        if (correo == null) return false;
+
+        DBHelper dbh = new DBHelper(ctx);
+        int id = dbh.obtenerIdUsuarioPorCorreo(correo);
+        return id != 0 && dbh.esAdmin(id);
     }
 }

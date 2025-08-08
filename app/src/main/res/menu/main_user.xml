@@ -10,28 +10,9 @@
             android:title="@string/menu_home" />
 
         <item
-            android:id="@+id/agregarProducto"
-            android:icon="@drawable/ic_add"
-            android:title="Agregar Producto" />
-
-        <item
-            android:id="@+id/listaProductos"
-            android:icon="@drawable/ic_list"
-            android:title="Lista de Productos" />
-
-        <item
             android:id="@+id/carrito"
             android:icon="@drawable/ic_carrito"
             android:title="Carrito" />
-        <item
-            android:id="@+id/comprasAdmin"
-            android:title="Lista de ventas"
-            android:icon="@drawable/ic_ventas" />
-
-        <item
-            android:id="@+id/alertasAdmin"
-            android:title="Notificaciones"
-            android:icon="@drawable/ic_notificacion" />
 
         <item
             android:id="@+id/nav_logout"

@@ -5,9 +5,10 @@
 
     <group android:checkableBehavior="single">
         <item
-            android:id="@+id/nav_home"
-            android:icon="@drawable/ic_home"
-            android:title="@string/menu_home" />
+            android:id="@+id/dashboardKpiFragment"
+            android:title="Dashboard KPIs"
+            android:icon="@drawable/ic_dashboard" />
+
 
         <item
             android:id="@+id/agregarProducto"
@@ -19,10 +20,6 @@
             android:icon="@drawable/ic_list"
             android:title="Lista de Productos" />
 
-        <item
-            android:id="@+id/carrito"
-            android:icon="@drawable/ic_carrito"
-            android:title="Carrito" />
         <item
             android:id="@+id/comprasAdmin"
             android:title="Lista de ventas"

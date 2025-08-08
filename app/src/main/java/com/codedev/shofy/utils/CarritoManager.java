@@ -1,5 +1,8 @@
 package com.codedev.shofy.utils;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+
 import com.codedev.shofy.models.ItemCarrito;
 import com.codedev.shofy.models.Producto;
 
@@ -67,5 +70,15 @@ public class CarritoManager {
         // Si no existe, lo agregamos
         items.add(new ItemCarrito(producto, cantidadNueva));
     }
+    private boolean isAdminLoggedIn(Context ctx) {
+        SharedPreferences sp = ctx.getSharedPreferences("sesion", Context.MODE_PRIVATE);
+        String correo = sp.getString("correo", null);
+        if (correo == null) return false;
+
+        com.codedev.shofy.DB.DBHelper dbh = new com.codedev.shofy.DB.DBHelper(ctx);
+        int id = dbh.obtenerIdUsuarioPorCorreo(correo);
+        return id != 0 && dbh.esAdmin(id);
+    }
+
 
 }

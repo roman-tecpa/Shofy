@@ -245,4 +245,15 @@ public class Carrito extends Fragment {
             default: return 0.0;
         }
     }
+
+    private boolean isAdminLoggedIn(Context ctx) {
+        SharedPreferences sp = ctx.getSharedPreferences("sesion", Context.MODE_PRIVATE);
+        String correo = sp.getString("correo", null);
+        if (correo == null) return false;
+
+        com.codedev.shofy.DB.DBHelper dbh = new com.codedev.shofy.DB.DBHelper(ctx);
+        int id = dbh.obtenerIdUsuarioPorCorreo(correo);
+        return id != 0 && dbh.esAdmin(id);
+    }
+
 }
