@@ -106,18 +106,49 @@ public class MainActivity extends AppCompatActivity {
         });
 
         // ✅ Ocultar Toolbar y FAB en login y registro
+        // Dentro de onCreate(), después de inicializar navController y binding:
         navController.addOnDestinationChangedListener((controller, destination, arguments) -> {
             int id = destination.getId();
-            boolean ocultarUI = (id == R.id.login || id == R.id.registro);
 
-            if (ocultarUI) {
-                binding.appBarMain.toolbar.setVisibility(View.GONE);
-                binding.appBarMain.fab.setVisibility(View.GONE);
-            } else {
-                binding.appBarMain.toolbar.setVisibility(View.VISIBLE);
-                binding.appBarMain.fab.setVisibility(View.VISIBLE);
-            }
+            // Toolbar solo se oculta en login/registro (opcional)
+            boolean ocultarToolbar = (id == R.id.login || id == R.id.registro);
+            binding.appBarMain.toolbar.setVisibility(ocultarToolbar ? View.GONE : View.VISIBLE);
+
+            // FAB: solo ocultar en Carrito
+            actualizarFab(id);
         });
+        binding.appBarMain.fab.show();
+
+
+    }
+
+    private void actualizarFab(int destinationId) {
+        boolean ocultarFab = (destinationId == R.id.carrito); // ajusta el ID si es distinto
+
+        if (ocultarFab) {
+            // Solo hide(), nada de setVisibility(GONE)
+            if (binding.appBarMain.fab.getVisibility() == View.VISIBLE) {
+                binding.appBarMain.fab.hide();
+            }
+        } else {
+            // Asegura que se muestre tras la transición
+            binding.appBarMain.fab.post(() -> {
+                binding.appBarMain.fab.show();
+                // Si por alguna razón quedó INVISIBLE, fuerzalo a VISIBLE
+                if (binding.appBarMain.fab.getVisibility() != View.VISIBLE) {
+                    binding.appBarMain.fab.setVisibility(View.VISIBLE);
+                }
+            });
+        }
+    }
+
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (navController != null && navController.getCurrentDestination() != null) {
+            actualizarFab(navController.getCurrentDestination().getId());
+        }
     }
 
     @Override

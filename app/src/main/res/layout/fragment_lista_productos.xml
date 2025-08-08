@@ -2,23 +2,177 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F2F2F2">
+    android:background="#F5F7FB"
+    android:padding="12dp">
 
+    <!-- Buscador -->
     <EditText
         android:id="@+id/editBuscarProducto"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_margin="8dp"
-        android:hint="Buscar producto"
-        android:background="@android:drawable/edit_text"
-        android:padding="10dp"
-        android:inputType="text"
+        android:layout_height="44dp"
+        android:hint="Buscar productos..."
+        android:drawableStart="@android:drawable/ic_menu_search"
+        android:drawablePadding="8dp"
+        android:paddingHorizontal="14dp"
+        android:imeOptions="actionSearch"
+        android:singleLine="true"
+        android:background="@drawable/bg_search"
         android:layout_alignParentTop="true" />
 
+    <!-- Divider superior -->
+    <View
+        android:id="@+id/dividerTop"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#E5E7EB"
+        android:layout_below="@id/editBuscarProducto"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="12dp" />
+
+    <!-- Botones de categorías -->
+    <LinearLayout
+        android:id="@+id/layoutCategorias"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/dividerTop"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:weightSum="4"
+        android:layout_marginBottom="12dp">
+
+        <!-- Papelería -->
+        <LinearLayout
+            android:id="@+id/btnPapeleria"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="10dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_category"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/ic_papeleria" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Papelería"
+                android:textSize="12sp"
+                android:textColor="#111827"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+
+        <!-- Supermercado -->
+        <LinearLayout
+            android:id="@+id/btnSupermercado"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="10dp"
+            android:layout_marginHorizontal="6dp"
+            android:background="@drawable/bg_category"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/ic_supermercado" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Super M."
+                android:textSize="12sp"
+                android:textColor="#111827"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+
+        <!-- Droguería -->
+        <LinearLayout
+            android:id="@+id/btnDrogueria"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="10dp"
+            android:layout_marginHorizontal="6dp"
+            android:background="@drawable/bg_category"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/ic_drogueria" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Droguería"
+                android:textSize="12sp"
+                android:textColor="#111827"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+
+        <!-- Todos -->
+        <LinearLayout
+            android:id="@+id/btnTodos"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="10dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_category"
+            android:foreground="?attr/selectableItemBackground"
+            android:clickable="true"
+            android:focusable="true">
+
+            <ImageView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                android:src="@drawable/ic_todos" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Todos"
+                android:textSize="12sp"
+                android:textColor="#111827"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <!-- Divider inferior -->
+    <View
+        android:id="@+id/dividerBottom"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#E5E7EB"
+        android:layout_below="@id/layoutCategorias"
+        android:layout_marginBottom="10dp" />
+
+    <!-- Lista -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/recyclerProductos"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/editBuscarProducto"
-        android:padding="8dp" />
+        android:layout_below="@id/dividerBottom"
+        android:paddingBottom="8dp"
+        android:clipToPadding="false" />
+
 </RelativeLayout>

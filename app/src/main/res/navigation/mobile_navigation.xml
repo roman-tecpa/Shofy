@@ -78,6 +78,10 @@
         android:name="com.codedev.shofy.Login"
         android:label="Login"
         tools:layout="@layout/fragment_login" />
+    <fragment
+        android:id="@+id/comprasAdmin"
+        android:name="com.codedev.shofy.ComprasAdmin"
+        android:label="ComprasAdmin" />
 
 
 </navigation>

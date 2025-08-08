@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_card"
+    android:layout_marginBottom="10dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <!-- Columna de textos -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/txtCompraId"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="#123"
+                android:textStyle="bold"
+                android:textColor="#111827"
+                android:textSize="16sp"/>
+
+            <!-- Un producto de la compra (+N más) -->
+            <TextView
+                android:id="@+id/txtCompraProducto"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Cuaderno profesional (+2 más)"
+                android:textColor="#1F2937"
+                android:layout_marginTop="2dp"/>
+
+            <TextView
+                android:id="@+id/txtCompraFecha"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="01/08/2025 14:25"
+                android:textColor="#374151"
+                android:layout_marginTop="2dp"/>
+
+            <TextView
+                android:id="@+id/txtCompraTotal"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="$0.00"
+                android:textStyle="bold"
+                android:textColor="#0F766E"
+                android:textSize="16sp"
+                android:layout_marginTop="6dp"/>
+        </LinearLayout>
+
+        <!-- Botón-cuadro verde para descargar PDF -->
+        <TextView
+            android:id="@+id/btnDescargarTicket"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="8dp"
+            android:gravity="center"
+            android:text="PDF"
+            android:textStyle="bold"
+            android:textColor="@android:color/white"
+            android:background="@drawable/bg_button"
+            android:foreground="?attr/selectableItemBackground"
+            android:padding="0dp"/>
+    </LinearLayout>
+
+</LinearLayout>

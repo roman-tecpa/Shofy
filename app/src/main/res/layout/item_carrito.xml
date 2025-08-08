@@ -1,83 +1,144 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
-    android:padding="12dp"
-    android:background="?attr/selectableItemBackground">
+    android:layout_marginHorizontal="12dp"
+    android:layout_marginVertical="6dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="4dp"
+    app:cardUseCompatPadding="true">
 
-    <!-- Nombre del producto -->
-    <TextView
-        android:id="@+id/txtNombreProductoCarrito"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Nombre Producto"
-        android:textSize="16sp"
-        android:textStyle="bold" />
-
-    <!-- Precio unitario -->
-    <TextView
-        android:id="@+id/txtPrecioUnitarioProductoCarrito"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Precio Unitario"
-        android:textSize="14sp" />
-
-    <!-- Subtotal -->
-    <TextView
-        android:id="@+id/txtSubtotalProductoCarrito"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Subtotal"
-        android:textSize="14sp"
-        android:textStyle="italic" />
-
-    <!-- Controles de cantidad y eliminar -->
     <LinearLayout
+        android:orientation="vertical"
+        android:padding="14dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical"
-        android:paddingTop="8dp">
+        android:foreground="?attr/selectableItemBackground">
 
-        <!-- Botón disminuir -->
-        <Button
-            android:id="@+id/btnRestarCantidad"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="➖"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:padding="6dp"/>
-
-        <!-- Texto cantidad actual -->
+        <!-- Nombre del producto -->
         <TextView
-            android:id="@+id/txtCantidadProductoCarrito"
-            android:layout_width="wrap_content"
+            android:id="@+id/txtNombreProductoCarrito"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="1"
-            android:textSize="14sp"
-            android:layout_marginHorizontal="12dp"/>
+            android:text="Nombre Producto"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="#111827" />
 
-        <!-- Botón aumentar -->
-        <Button
-            android:id="@+id/btnSumarCantidad"
-            android:layout_width="wrap_content"
+        <!-- Fila de precios: unitario + subtotal -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="➕"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:padding="6dp"/>
+            android:orientation="horizontal"
+            android:layout_marginTop="6dp"
+            android:gravity="center_vertical">
 
-        <!-- Botón eliminar -->
-        <Button
-            android:id="@+id/btnEliminarItem"
-            android:layout_width="wrap_content"
+            <TextView
+                android:id="@+id/txtPrecioUnitarioProductoCarrito"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Precio unitario: $0.00"
+                android:textSize="13sp"
+                android:textColor="#065F46"
+                android:background="@drawable/bg_price_pill"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp" />
+
+            <Space
+                android:layout_width="8dp"
+                android:layout_height="1dp" />
+
+            <TextView
+                android:id="@+id/txtSubtotalProductoCarrito"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Subtotal: $0.00"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:textColor="#111827"
+                android:background="@drawable/bg_chip_subtotal"
+                android:paddingLeft="10dp"
+                android:paddingRight="10dp"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp" />
+        </LinearLayout>
+
+        <!-- Divider suave -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="10dp"
+            android:background="#E5E7EB" />
+
+        <!-- Controles de cantidad y eliminar -->
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="🗑️"
-            android:layout_marginStart="20dp"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:padding="6dp"/>
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginTop="10dp">
+
+            <!-- Botón disminuir -->
+            <Button
+                android:id="@+id/btnRestarCantidad"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="–"
+                android:textSize="16sp"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/bg_round_icon"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp" />
+
+            <!-- Cantidad actual -->
+            <TextView
+                android:id="@+id/txtCantidadProductoCarrito"
+                android:layout_width="60dp"
+                android:layout_height="40dp"
+                android:layout_marginHorizontal="10dp"
+                android:gravity="center"
+                android:text="1"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="#111827"
+                android:background="@drawable/bg_qty_box" />
+
+            <!-- Botón aumentar -->
+            <Button
+                android:id="@+id/btnSumarCantidad"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="+"
+                android:textSize="16sp"
+                android:textColor="#FFFFFF"
+                android:background="@drawable/bg_round_icon"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp" />
+
+            <!-- Expansor -->
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <!-- Botón eliminar -->
+            <Button
+                android:id="@+id/btnEliminarItem"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:text="🗑️"
+                android:textSize="14sp"
+                android:textColor="#B91C1C"
+                android:background="@drawable/bg_round_icon_danger"
+                android:minWidth="0dp"
+                android:minHeight="0dp"
+                android:padding="0dp" />
+        </LinearLayout>
+
     </LinearLayout>
-</LinearLayout>
+</androidx.cardview.widget.CardView>

@@ -154,13 +154,13 @@
                 android:id="@+id/btnAgregarProducto"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/bg_button"
+                android:backgroundTint="#1E88E5"
+                android:padding="12dp"
                 android:text="Agregar producto"
                 android:textAllCaps="false"
-                android:textColor="#FFFFFF"
-                android:backgroundTint="#1E88E5"
-                android:layout_marginTop="20dp"
-                android:padding="12dp"
-                android:background="@drawable/bg_button" />
+                android:textColor="#FFFFFF" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

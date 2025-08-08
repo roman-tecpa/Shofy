@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="12dp"
+    android:background="#F5F7FB"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Encabezado -->
+    <TextView
+        android:id="@+id/titleCompras"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Compras realizadas"
+        android:textStyle="bold"
+        android:textSize="18sp"
+        android:textColor="#111827"
+        android:layout_marginBottom="8dp" />
+
+    <!-- Chips de periodo rápido -->
+    <LinearLayout
+        android:id="@+id/chipsPeriodo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="10dp">
+
+        <TextView
+            android:id="@+id/chipHoy"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:gravity="center"
+            android:paddingHorizontal="14dp"
+            android:text="Hoy"
+            android:textStyle="bold"
+            android:textColor="#111827"
+            android:background="@drawable/bg_category"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:id="@+id/chipSemana"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:gravity="center"
+            android:paddingHorizontal="14dp"
+            android:text="Esta semana"
+            android:textStyle="bold"
+            android:textColor="#111827"
+            android:background="@drawable/bg_category"
+            android:layout_marginEnd="8dp" />
+
+        <TextView
+            android:id="@+id/chipMes"
+            android:layout_width="wrap_content"
+            android:layout_height="36dp"
+            android:gravity="center"
+            android:paddingHorizontal="14dp"
+            android:text="Este mes"
+            android:textStyle="bold"
+            android:textColor="#111827"
+            android:background="@drawable/bg_category" />
+    </LinearLayout>
+
+    <!-- Rango de fechas (estilo search/chip) -->
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="10dp">
+
+        <EditText
+            android:id="@+id/etDesde"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:textSize="10sp"
+            android:hint="Fecha Inicio"
+            android:focusable="false"
+            android:clickable="true"
+            android:padding="10dp"
+            android:drawableStart="@android:drawable/ic_menu_my_calendar"
+            android:drawablePadding="8dp"
+            android:background="@drawable/bg_search"/>
+
+        <View
+            android:layout_width="8dp"
+            android:layout_height="1dp" />
+
+        <EditText
+            android:id="@+id/etHasta"
+            android:layout_width="0dp"
+            android:layout_height="44dp"
+            android:layout_weight="1"
+            android:textSize="10sp"
+            android:hint="Fecha Fin"
+            android:focusable="false"
+            android:clickable="true"
+            android:padding="10dp"
+            android:drawableStart="@android:drawable/ic_menu_my_calendar"
+            android:drawablePadding="8dp"
+            android:background="@drawable/bg_search"/>
+
+        <View
+            android:layout_width="8dp"
+            android:layout_height="1dp" />
+
+        <TextView
+            android:id="@+id/btnFiltrar"
+            android:layout_width="wrap_content"
+            android:layout_height="44dp"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="14dp"
+            android:text="Filtrar"
+            android:textStyle="bold"
+            android:textColor="#ffffff"
+            android:background="@drawable/bg_btn_primary"/>
+    </LinearLayout>
+
+    <!-- Lista -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerCompras"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="8dp"/>
+</LinearLayout>
