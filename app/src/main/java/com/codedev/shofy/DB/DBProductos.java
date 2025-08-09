@@ -44,6 +44,16 @@ public class DBProductos extends DBHelper {
         return id;
     }
 
+    public boolean existeProducto(String nombre) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT id FROM Productos WHERE nombre = ?", new String[]{nombre});
+        boolean existe = cursor.moveToFirst();
+        cursor.close();
+        db.close();
+        return existe;
+    }
+
+
     public boolean eliminarProducto(int id) {
         boolean eliminado = false;
         SQLiteDatabase db = this.getWritableDatabase();

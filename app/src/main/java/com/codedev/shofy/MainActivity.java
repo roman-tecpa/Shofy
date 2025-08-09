@@ -37,14 +37,22 @@ public class MainActivity extends AppCompatActivity {
     private ActivityMainBinding binding;
     private NavController navController;
 
-
-    // Destinos exclusivos de ADMIN
+    // Destinos exclusivos de ADMIN (lo que SÍ puede ver el admin)
     private static final Set<Integer> ADMIN_ONLY = new HashSet<>(
             Arrays.asList(
+                    R.id.dashboardKpiFragment,
                     R.id.listaProductos,
-                    R.id.agregarProducto,
-                    R.id.alertasAdmin,
-                    R.id.comprasAdmin
+                    R.id.comprasAdmin,
+                    R.id.alertasAdmin
+            )
+    );
+
+    // Pantallas de "tienda" que NO debe ver el admin (bloqueo y redirección)
+    private static final Set<Integer> STORE_BLOCKED_FOR_ADMIN = new HashSet<>(
+            Arrays.asList(
+                    R.id.nav_home,
+                    R.id.carrito,
+                    R.id.detalladoProducto
             )
     );
 
@@ -60,7 +68,23 @@ public class MainActivity extends AppCompatActivity {
 
         setSupportActionBar(binding.appBarMain.toolbar);
 
-        // NavController desde el NavHostFragment
+        binding.appBarMain.toolbar.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.actions_conocenos) {
+                try {
+                    if (navController.getCurrentDestination() == null ||
+                            navController.getCurrentDestination().getId() != R.id.conocenosFragment) {
+                        navController.navigate(R.id.conocenosFragment);
+                    }
+                } catch (Exception e) {
+                    Toast.makeText(this, "No pude abrir 'Conócenos'", Toast.LENGTH_SHORT).show();
+                }
+                return true;
+            }
+            return false;
+        });
+
+
+
         NavHostFragment navHostFragment =
                 (NavHostFragment) getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment_content_main);
         if (navHostFragment == null) {
@@ -88,14 +112,20 @@ public class MainActivity extends AppCompatActivity {
         DrawerLayout drawer = binding.drawerLayout;
         NavigationView navigationView = binding.navView;
 
+        // Top-level destinations (hamburguesa en la barra)
+        // Incluimos tanto los de usuario como los admin; el gateo abajo evita que el admin entre a tienda.
         mAppBarConfiguration = new AppBarConfiguration.Builder(
-                R.id.nav_home, R.id.agregarProducto, R.id.listaProductos, R.id.carrito, R.id.alertasAdmin)
+                R.id.nav_home,
+                R.id.listaProductos,
+                R.id.comprasAdmin,
+                R.id.alertasAdmin,
+                R.id.dashboardKpiFragment
+        )
                 .setOpenableLayout(drawer)
                 .build();
 
         NavigationUI.setupActionBarWithNavController(this, navController, mAppBarConfiguration);
         NavigationUI.setupWithNavController(navigationView, navController);
-
 
         inflarMenuPorRol(false);
         binding.getRoot().post(this::actualizarHeaderDrawer);
@@ -132,14 +162,21 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             }
 
-            // Gate admin desde el Drawer
             if (!isAdminLoggedIn(this) && ADMIN_ONLY.contains(itemId)) {
                 Toast.makeText(this, "Opción solo para administradores", Toast.LENGTH_SHORT).show();
                 binding.drawerLayout.closeDrawers();
                 return true;
             }
 
-            // Navegación normal
+            if (isAdminLoggedIn(this) && STORE_BLOCKED_FOR_ADMIN.contains(itemId)) {
+                Toast.makeText(this, "Vista no disponible para administradores", Toast.LENGTH_SHORT).show();
+                binding.drawerLayout.closeDrawers();
+                binding.getRoot().postDelayed(() -> {
+                    try { navController.navigate(R.id.dashboardKpiFragment); } catch (Exception ignored) {}
+                }, 180);
+                return true;
+            }
+
             binding.drawerLayout.closeDrawers();
             binding.getRoot().postDelayed(() -> {
                 try {
@@ -161,9 +198,16 @@ public class MainActivity extends AppCompatActivity {
             return true;
         });
 
-        // Gate global (deeplinks / navigate externos) + Toolbar/FAB
         navController.addOnDestinationChangedListener((controller, destination, args) -> {
             int id = destination.getId();
+
+            if (isAdminLoggedIn(this) && STORE_BLOCKED_FOR_ADMIN.contains(id)) {
+                Toast.makeText(this, "Redirigido al Dashboard (vista de admin)", Toast.LENGTH_SHORT).show();
+                binding.getRoot().post(() -> {
+                    try { navController.navigate(R.id.dashboardKpiFragment); } catch (Exception ignored) {}
+                });
+                return;
+            }
 
             if (!isAdminLoggedIn(this) && ADMIN_ONLY.contains(id)) {
                 Toast.makeText(this, "No tienes permisos para acceder aquí", Toast.LENGTH_SHORT).show();
@@ -179,7 +223,6 @@ public class MainActivity extends AppCompatActivity {
             actualizarFab(id);
         });
 
-        // Auto-skip del login si ya hay sesión
         binding.getRoot().post(() -> {
             try {
                 if (navController.getCurrentDestination() != null &&
@@ -204,20 +247,15 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
 
-        // Re-inflar por si cambió la sesión/rol y refrescar header
         inflarMenuPorRol(true);
         binding.getRoot().post(this::actualizarHeaderDrawer);
 
-        // Purga alertas antiguas y re-checar stock si es admin
         try { new DBHelper(this).borrarAlertasAntiguas24h(); } catch (Exception ignored) {}
         if (isAdminLoggedIn(this)) verificarStockBajo();
 
-        // Refrescar FAB según destino actual
         if (navController != null && navController.getCurrentDestination() != null) {
             actualizarFab(navController.getCurrentDestination().getId());
         }
-
-        // Refrescar badge si existe
         try {
             android.view.MenuItem item = binding.navView.getMenu().findItem(R.id.alertasAdmin);
             if (item != null && item.getActionView() != null) {
@@ -227,6 +265,8 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception ignored) {}
     }
 
+
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main, menu);
@@ -234,19 +274,31 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
+    public boolean onOptionsItemSelected(android.view.MenuItem item) {
+        if (item.getItemId() == R.id.actions_conocenos) {
+            try {
+                if (navController.getCurrentDestination() == null ||
+                        navController.getCurrentDestination().getId() != R.id.conocenosFragment) {
+                    navController.navigate(R.id.conocenosFragment);
+                }
+            } catch (Exception e) {
+                Toast.makeText(this, "No pude abrir 'Conócenos'", Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+
+    @Override
     public boolean onSupportNavigateUp() {
         return NavigationUI.navigateUp(navController, mAppBarConfiguration)
                 || super.onSupportNavigateUp();
     }
-
-    // ------------------------
-    // Helpers de sesión/rol
-    // ------------------------
     private boolean isLoggedIn() {
         SharedPreferences sp = getSharedPreferences("sesion", Context.MODE_PRIVATE);
         return sp.getString("correo", null) != null;
     }
-
     private boolean isAdminLoggedIn(Context ctx) {
         SharedPreferences sp = ctx.getSharedPreferences("sesion", Context.MODE_PRIVATE);
         String correo = sp.getString("correo", null);
@@ -255,10 +307,6 @@ public class MainActivity extends AppCompatActivity {
         int id = dbh.obtenerIdUsuarioPorCorreo(correo);
         return id != 0 && dbh.esAdmin(id);
     }
-
-    // ------------------------
-    // UI helpers
-    // ------------------------
     private void actualizarHeaderDrawer() {
         if (binding == null || binding.navView == null) {
             Log.w("HEADER", "binding/navView aún no listos");
@@ -272,15 +320,12 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
         if (header == null) return;
-
         android.widget.TextView tvNombre = header.findViewById(R.id.tvNombreHeader);
         android.widget.TextView tvCorreo = header.findViewById(R.id.tvCorreoHeader);
         android.widget.TextView tvRol    = header.findViewById(R.id.tvRolHeader);
-
         SharedPreferences sp = getSharedPreferences("sesion", Context.MODE_PRIVATE);
         int idUsuario = sp.getInt("idUsuario", 0);
         String correo = sp.getString("correo", "");
-
         String nombre = "";
         boolean admin = false;
         try {
@@ -295,20 +340,16 @@ public class MainActivity extends AppCompatActivity {
         if (tvCorreo != null) tvCorreo.setText(correo != null && !correo.isEmpty() ? correo : "—");
         if (tvRol != null)    tvRol.setText(admin ? "Administrador" : "Usuario");
     }
-
     private void inflarMenuPorRol(boolean conservarSeleccionActual) {
         if (binding == null || binding.navView == null) {
             Log.w("MENU", "binding/navView no listos aún");
             return;
         }
-
         boolean admin = isAdminLoggedIn(this);
-
         int checkedItemId = 0;
         if (conservarSeleccionActual && binding.navView.getCheckedItem() != null) {
             checkedItemId = binding.navView.getCheckedItem().getItemId();
         }
-
         Menu menu = binding.navView.getMenu();
         menu.clear();
         if (admin) {
@@ -316,25 +357,22 @@ public class MainActivity extends AppCompatActivity {
         } else {
             getMenuInflater().inflate(R.menu.main_user, menu);
         }
-
         if (checkedItemId != 0 && menu.findItem(checkedItemId) != null) {
             binding.navView.setCheckedItem(checkedItemId);
         }
-
         configurarBadgeAlertas();
     }
 
     private void actualizarFab(int destinationId) {
         boolean ocultarFab =
-                (destinationId == R.id.carrito
-                        || destinationId == R.id.editarProducto
-                        || destinationId == R.id.comprasAdmin
+                (destinationId == R.id.dashboardKpiFragment
                         || destinationId == R.id.listaProductos
-                        || destinationId == R.id.agregarProducto
+                        || destinationId == R.id.comprasAdmin
+                        || destinationId == R.id.alertasAdmin
+                        || destinationId == R.id.carrito
+                        || destinationId == R.id.editarProducto
                         || destinationId == R.id.login
-                        || destinationId == R.id.registro
-                        || destinationId == R.id.alertasAdmin);
-
+                        || destinationId == R.id.registro);
         if (ocultarFab) {
             if (binding.appBarMain.fab.getVisibility() == View.VISIBLE) {
                 binding.appBarMain.fab.hide();
@@ -396,9 +434,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // ------------------------
-    // Navegación post-login
-    // ------------------------
     public void aplicarRolYRedirigir() {
         boolean admin = isAdminLoggedIn(this);
         inflarMenuPorRol(false);

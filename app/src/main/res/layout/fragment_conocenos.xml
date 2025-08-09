@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tvTituloConocenos"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Conócenos"
+            android:textSize="22sp"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:paddingBottom="12dp" />
+
+        <TextView
+            android:id="@+id/tvDescripcionConocenos"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Shofy es una aplicación diseñada para facilitar tus compras, permitiéndote explorar productos, agregarlos a tu carrito y recibirlos en tu domicilio. Nuestro objetivo es brindarte una experiencia rápida, segura y amigable."
+            android:textSize="16sp"
+            android:lineSpacingExtra="4dp" />
+
+        <ImageView
+            android:id="@+id/imgConocenos"
+            android:layout_width="match_parent"
+            android:layout_height="331dp"
+            android:layout_marginTop="20dp"
+            android:scaleType="centerCrop"
+            android:src="@drawable/ic_shofy" />
+
+        <TextView
+            android:id="@+id/integrantesConocenos"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Esta aplicacion es creada para practicar todos los fundamentos del uso de Android Studio, aplicando una tienda con especificaciones de acuerdo a la materia de Programacion Movil.
+                                  Miembros del equipo: Roman Tecpa Perez y Miriam Jimenez Hernandez"
+            android:textSize="16sp"
+            android:lineSpacingExtra="4dp" />
+
+    </LinearLayout>
+</ScrollView>

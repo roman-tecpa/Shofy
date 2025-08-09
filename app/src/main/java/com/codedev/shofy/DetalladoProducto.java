@@ -1,16 +1,11 @@
+// app/src/main/java/com/codedev/shofy/DetalladoProducto.java
 package com.codedev.shofy;
 
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
-import android.widget.Button;
-import android.widget.ImageView;
-import android.widget.TextView;
-import android.widget.Toast;
-
+import android.view.*;
+import android.widget.*;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
@@ -47,8 +42,10 @@ public class DetalladoProducto extends Fragment {
         Bundle args = getArguments();
         if (args != null) {
             if (args.containsKey("producto")) {
+                // ✅ Recibir el objeto completo
                 producto = (Producto) args.getSerializable("producto");
             } else {
+                // Fallback por si en algún lugar envían claves sueltas
                 producto = new Producto(
                         args.getInt("id", 0),
                         args.getString("nombre", "N/A"),
@@ -104,7 +101,7 @@ public class DetalladoProducto extends Fragment {
             }
         });
 
-        // Botón 🛒 Agregar al carrito
+        // 🛒 Agregar al carrito
         btnAgregarCarrito.setOnClickListener(v -> {
             if (producto != null) {
                 int cantidadYaEnCarrito = CarritoManager.getInstancia().obtenerCantidadDeProducto(producto);
@@ -124,19 +121,15 @@ public class DetalladoProducto extends Fragment {
             }
         });
 
-        // Botón 🧾 Realizar compra (reinicia cantidad seleccionada en vez de acumular)
+        // 🧾 Realizar compra (actualiza cantidad sin acumular y navega a Carrito)
         btnRealizarCompra.setOnClickListener(v -> {
             try {
                 if (producto != null) {
                     if (cantidadSeleccionada <= producto.getCantidad_actual()) {
-                        // Actualiza cantidad en carrito con la cantidad seleccionada actual (sin sumar)
                         CarritoManager.getInstancia().actualizarCantidadProducto(producto, cantidadSeleccionada);
-
-                        // Reiniciar cantidad seleccionada y actualizar texto
                         cantidadSeleccionada = 1;
                         txtCantidad.setText(String.valueOf(cantidadSeleccionada));
 
-                        // Navegar al carrito
                         NavController navController = Navigation.findNavController(v);
                         if (navController.getCurrentDestination() == null ||
                                 navController.getCurrentDestination().getId() != R.id.carrito) {
@@ -158,11 +151,15 @@ public class DetalladoProducto extends Fragment {
     }
 
     private int obtenerIconoPorTipo(String tipo) {
-        switch (tipo) {
-            case "Papelería": return R.drawable.ic_papeleria;
-            case "Supermercado": return R.drawable.ic_supermercado;
-            case "Droguería": return R.drawable.ic_drogueria;
-            default: return R.drawable.ic_default;
+        if (tipo == null) return R.drawable.ic_default;
+        String t = tipo.trim().toLowerCase(java.util.Locale.ROOT);
+        switch (t) {
+            case "papelería":
+            case "papeleria":   return R.drawable.ic_papeleria;
+            case "supermercado":return R.drawable.ic_supermercado;
+            case "droguería":
+            case "drogueria":   return R.drawable.ic_drogueria;
+            default:            return R.drawable.ic_default;
         }
     }
 
@@ -175,5 +172,4 @@ public class DetalladoProducto extends Fragment {
         int id = dbh.obtenerIdUsuarioPorCorreo(correo);
         return id != 0 && dbh.esAdmin(id);
     }
-
 }

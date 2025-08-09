@@ -13,6 +13,11 @@
             android:id="@+id/carrito"
             android:icon="@drawable/ic_carrito"
             android:title="Carrito" />
+        <item
+            android:id="@+id/historialCompras"
+            android:title="Historial de compras"
+            android:icon="@drawable/ic_historialc" />
+
 
         <item
             android:id="@+id/nav_logout"

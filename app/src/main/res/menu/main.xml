@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
+
     <item
         android:id="@+id/actions_conocenos"
-        android:orderInCategory="100"
-        android:title="Conocenos"
-        app:showAsAction="never" />
-
+        android:title="Conócenos"
+        app:showAsAction="never" /> <!-- usa "always" si quieres verlo fijo en la Toolbar -->
 
 </menu>

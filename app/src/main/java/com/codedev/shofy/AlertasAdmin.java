@@ -1,19 +1,20 @@
 package com.codedev.shofy;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.LayoutInflater;
-import android.view.MenuInflater;
-import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.DividerItemDecoration;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
-import androidx.navigation.fragment.NavHostFragment;
 
 import com.codedev.shofy.DB.DBHelper;
 
@@ -26,6 +27,7 @@ public class AlertasAdmin extends Fragment {
 
     private RecyclerView rv;
     private AlertasAdapter adapter;
+    private DBHelper dbHelper;
 
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
@@ -34,22 +36,27 @@ public class AlertasAdmin extends Fragment {
     }
 
     @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View v = inflater.inflate(R.layout.fragment_alertas_admin, container, false);
         rv = v.findViewById(R.id.rvAlertas);
         rv.setLayoutManager(new LinearLayoutManager(requireContext()));
         rv.addItemDecoration(new DividerItemDecoration(requireContext(), DividerItemDecoration.VERTICAL));
+
         adapter = new AlertasAdapter();
         rv.setAdapter(adapter);
+
+        // Inicializa DBHelper una sola vez
+        dbHelper = new DBHelper(requireContext());
+
         cargar();
         return v;
     }
 
     private void cargar() {
-        DBHelper db = new DBHelper(requireContext());
-        ArrayList<String[]> data = db.listarAlertas(); // [id, titulo, mensaje, creado_en]
+        ArrayList<String[]> data = dbHelper.listarAlertas(); // [id, titulo, mensaje, creado_en]
         adapter.submit(data);
-        // refresca badge del drawer
+
+        // refresca menú por si hay badges/contadores
         requireActivity().invalidateOptionsMenu();
     }
 
@@ -59,52 +66,77 @@ public class AlertasAdmin extends Fragment {
         cargar();
     }
 
-    @Override
-    public void onCreateOptionsMenu(android.view.Menu menu, MenuInflater inflater) {
-        inflater.inflate(R.menu.menu_alertas, menu);
-        super.onCreateOptionsMenu(menu, inflater);
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.action_limpiar) {
-            // Limpia todo y refresca
-            DBHelper db = new DBHelper(requireContext());
-            db.borrarTodasAlertas();
-            cargar();
-            // también refresca el badge del drawer
-            try {
-                android.view.MenuItem mItem = ((MainActivity) requireActivity())
-                        .findViewById(R.id.alertasAdmin);
-            } catch (Exception ignored) {}
-            return true;
+    private void confirmarYLimpiarHistorial() {
+        int idUsuario = obtenerIdUsuarioSesion(requireContext());
+        if (idUsuario == 0) {
+            Toast.makeText(requireContext(), "Inicia sesión para limpiar tu historial.", Toast.LENGTH_SHORT).show();
+            return;
         }
-        return super.onOptionsItemSelected(item);
+
+        new androidx.appcompat.app.AlertDialog.Builder(requireContext())
+                .setTitle("Confirmar")
+                .setMessage("¿Seguro que deseas limpiar todo tu historial de compras?")
+                .setPositiveButton("Sí", (d, w) -> {
+                    int borrados = dbHelper.eliminarHistorialUsuario(idUsuario);
+                    if (borrados >= 0) {
+                        Toast.makeText(requireContext(), "Historial limpiado", Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(requireContext(), "No se pudo limpiar el historial", Toast.LENGTH_SHORT).show();
+                    }
+                    cargar(); // refrescar lista tras limpiar
+                })
+                .setNegativeButton("Cancelar", null)
+                .show();
     }
 
-    // ===== Adapter simple (simple_list_item_2) =====
+    private int obtenerIdUsuarioSesion(Context ctx) {
+        SharedPreferences sp = ctx.getSharedPreferences("sesion", Context.MODE_PRIVATE);
+        int id = sp.getInt("idUsuario", 0);
+        if (id == 0) {
+            String correo = sp.getString("correo", null);
+            if (correo != null) {
+                try { id = new DBHelper(ctx).obtenerIdUsuarioPorCorreo(correo); } catch (Exception ignored) {}
+            }
+        }
+        return id;
+    }
+
     static class AlertasAdapter extends RecyclerView.Adapter<AlertasAdapter.VH> {
         private ArrayList<String[]> items = new ArrayList<>();
 
-        void submit(ArrayList<String[]> d){ items = d; notifyDataSetChanged(); }
+        void submit(ArrayList<String[]> d) {
+            items = (d != null) ? d : new ArrayList<>();
+            notifyDataSetChanged();
+        }
 
-        @Override public VH onCreateViewHolder(ViewGroup p, int vt) {
-            View v = LayoutInflater.from(p.getContext()).inflate(android.R.layout.simple_list_item_2, p, false);
+        @NonNull
+        @Override public VH onCreateViewHolder(@NonNull ViewGroup p, int vt) {
+            View v = LayoutInflater.from(p.getContext())
+                    .inflate(android.R.layout.simple_list_item_2, p, false);
             return new VH(v);
         }
 
-        @Override public void onBindViewHolder(VH h, int pos) {
+        @Override public void onBindViewHolder(@NonNull VH h, int pos) {
             String[] row = items.get(pos); // [id, titulo, mensaje, creado_en]
-            String titulo = row[1];
-            String mensaje = row[2];
-            long ts = Long.parseLong(row[3]);
-            String fecha = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault()).format(new Date(ts));
-            ((TextView) h.itemView.findViewById(android.R.id.text1)).setText(titulo);
-            ((TextView) h.itemView.findViewById(android.R.id.text2)).setText(mensaje + " · " + fecha);
+            String titulo = (row.length > 1) ? row[1] : "";
+            String mensaje = (row.length > 2) ? row[2] : "";
+            String fechaTxt = "";
+            try {
+                long ts = (row.length > 3) ? Long.parseLong(row[3]) : 0L;
+                if (ts > 0) {
+                    fechaTxt = new SimpleDateFormat("dd/MM HH:mm", Locale.getDefault())
+                            .format(new Date(ts));
+                }
+            } catch (Exception ignored) {}
 
-            // Click: si quieres ir a lista de productos o editar, aquí podrías navegar
+            ((TextView) h.itemView.findViewById(android.R.id.text1)).setText(titulo);
+            ((TextView) h.itemView.findViewById(android.R.id.text2)).setText(
+                    fechaTxt.isEmpty() ? mensaje : (mensaje + " · " + fechaTxt)
+            );
+
+            // Click opcional
             h.itemView.setOnClickListener(v -> {
-                // Ejemplo: volver a Home
+                // Ejemplo: navegar o mostrar detalle
                 // NavHostFragment.findNavController(AlertasAdmin.this).navigate(R.id.nav_home);
             });
         }
@@ -112,7 +144,7 @@ public class AlertasAdmin extends Fragment {
         @Override public int getItemCount() { return items.size(); }
 
         static class VH extends RecyclerView.ViewHolder {
-            VH(View itemView){ super(itemView); }
+            VH(@NonNull View itemView){ super(itemView); }
         }
     }
 }

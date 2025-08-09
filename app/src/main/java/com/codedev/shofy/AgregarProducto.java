@@ -10,7 +10,6 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.Toast;
-
 import com.codedev.shofy.DB.DBProductos;
 
 public class AgregarProducto extends Fragment {
@@ -28,7 +27,6 @@ public class AgregarProducto extends Fragment {
                              Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_agregar_producto, container, false);
 
-        // Referencias a los campos de la vista
         nombreProducto = view.findViewById(R.id.nombreProducto);
         descripcionProducto = view.findViewById(R.id.descripcionProducto);
         cantidadActual = view.findViewById(R.id.cantidadActual);
@@ -37,7 +35,6 @@ public class AgregarProducto extends Fragment {
         spinnerCategoria = view.findViewById(R.id.tipoProducto);
         btnAgregarProducto = view.findViewById(R.id.btnAgregarProducto);
 
-        // Cargar opciones desde strings.xml
         ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
                 getContext(),
                 R.array.tipos_producto,
@@ -56,7 +53,6 @@ public class AgregarProducto extends Fragment {
                 String precioStr = precioBase.getText().toString().trim();
                 String categoria = spinnerCategoria.getSelectedItem().toString();
 
-                // Validación de campos vacíos
                 if (nombre.isEmpty() || descripcion.isEmpty() || cantidadStr.isEmpty() || minimoStr.isEmpty() || precioStr.isEmpty()) {
                     Toast.makeText(getContext(), "Por favor completa todos los campos", Toast.LENGTH_SHORT).show();
                     return;
@@ -68,6 +64,13 @@ public class AgregarProducto extends Fragment {
                     double precio = Double.parseDouble(precioStr);
 
                     DBProductos dbProductos = new DBProductos(getContext());
+
+                    // 🔹 Verificar si ya existe un producto con el mismo nombre
+                    if (dbProductos.existeProducto(nombre)) {
+                        Toast.makeText(getContext(), "El producto ya existe", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+
                     long id = dbProductos.registrarProducto(nombre, descripcion, categoria, cantidad, minimo, precio);
 
                     if (id > 0) {
@@ -85,9 +88,6 @@ public class AgregarProducto extends Fragment {
 
         return view;
     }
-
-
-
 
     private void limpiarCampos() {
         nombreProducto.setText("");

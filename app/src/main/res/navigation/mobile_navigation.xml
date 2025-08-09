@@ -89,8 +89,19 @@
     <fragment
         android:id="@+id/dashboardKpiFragment"
         android:name="com.codedev.shofy.DashboardKpiFragment"
-        android:label="fragment_dashboard_kpi"
+        android:label="DASHBOARD"
         tools:layout="@layout/fragment_dashboard_kpi" />
+
+    <fragment
+        android:id="@+id/historialCompras"
+        android:name="com.codedev.shofy.historial.HistorialComprasFragment"
+        android:label="Historial de Compras" />
+    <fragment
+        android:id="@+id/conocenosFragment"
+        android:name="com.codedev.shofy.ConocenosFragment"
+        android:label="Conócenos"
+        tools:layout="@layout/fragment_conocenos" />
+
 
 
 </navigation>
