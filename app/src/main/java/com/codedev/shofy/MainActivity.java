@@ -1,15 +1,27 @@
 package com.codedev.shofy;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.View;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.navigation.NavController;
+import androidx.navigation.fragment.NavHostFragment;
+import androidx.navigation.ui.AppBarConfiguration;
+import androidx.navigation.ui.NavigationUI;
+import androidx.work.WorkManager;
 
 import com.codedev.shofy.DB.DBHelper;
 import com.codedev.shofy.databinding.ActivityMainBinding;
@@ -20,14 +32,6 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.navigation.NavController;
-import androidx.navigation.fragment.NavHostFragment;
-import androidx.navigation.ui.AppBarConfiguration;
-import androidx.navigation.ui.NavigationUI;
-import androidx.work.WorkManager;
-
 public class MainActivity extends AppCompatActivity {
 
     // ------------------------
@@ -35,9 +39,16 @@ public class MainActivity extends AppCompatActivity {
     // ------------------------
     private AppBarConfiguration mAppBarConfiguration;
     private ActivityMainBinding binding;
+
+    // Instancia única del helper
+    private DBHelper dbHelper;
+
     private NavController navController;
 
-    // Destinos exclusivos de ADMIN (lo que SÍ puede ver el admin)
+    // Notificaciones
+    private static final String CH_STOCK = "stock_low_channel";
+
+    // Destinos exclusivos de ADMIN
     private static final Set<Integer> ADMIN_ONLY = new HashSet<>(
             Arrays.asList(
                     R.id.dashboardKpiFragment,
@@ -47,7 +58,7 @@ public class MainActivity extends AppCompatActivity {
             )
     );
 
-    // Pantallas de "tienda" que NO debe ver el admin (bloqueo y redirección)
+    // Pantallas bloqueadas para ADMIN (no debe entrar ahí)
     private static final Set<Integer> STORE_BLOCKED_FOR_ADMIN = new HashSet<>(
             Arrays.asList(
                     R.id.nav_home,
@@ -55,6 +66,29 @@ public class MainActivity extends AppCompatActivity {
                     R.id.detalladoProducto
             )
     );
+
+    // —— NUEVO: Control centralizado de visibilidad del FAB ——
+    /** Siempre oculto el FAB en estos destinos (para cualquier rol). */
+    private static final Set<Integer> FAB_HIDE_ALWAYS = new HashSet<>(Arrays.asList(
+            R.id.dashboardKpiFragment,
+            R.id.listaProductos,
+            R.id.comprasAdmin,
+            R.id.alertasAdmin,
+            R.id.carrito,
+            R.id.editarProducto,
+            R.id.login,
+            R.id.registro,
+            R.id.agregarProducto
+            // Agrega aquí otros destinos donde NO quieres ver el FAB nunca
+            // p.ej. R.id.conocenosFragment
+    ));
+
+    /** Oculto el FAB solo si es ADMIN en estos destinos. */
+    private static final Set<Integer> FAB_HIDE_IF_ADMIN = new HashSet<>(Arrays.asList(
+            R.id.nav_home,
+            R.id.detalladoProducto
+            // Agrega aquí los destinos donde, siendo admin, no debe ver FAB
+    ));
 
     // ------------------------
     // Ciclo de vida
@@ -65,9 +99,19 @@ public class MainActivity extends AppCompatActivity {
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
-
         setSupportActionBar(binding.appBarMain.toolbar);
 
+        // ===== DB & Notifs =====
+        dbHelper = new DBHelper(this);
+        try {
+            dbHelper.ensureTablaAlertas();      // <-- clave para evitar crash
+            dbHelper.borrarAlertasAntiguas24h();// opcional
+        } catch (Exception e) {
+            Log.e("DB_INIT", "Error asegurando Alertas", e);
+        }
+        crearCanalNotificaciones();
+
+        // Toolbar action
         binding.appBarMain.toolbar.setOnMenuItemClickListener(item -> {
             if (item.getItemId() == R.id.actions_conocenos) {
                 try {
@@ -83,8 +127,7 @@ public class MainActivity extends AppCompatActivity {
             return false;
         });
 
-
-
+        // Nav Controller
         NavHostFragment navHostFragment =
                 (NavHostFragment) getSupportFragmentManager().findFragmentById(R.id.nav_host_fragment_content_main);
         if (navHostFragment == null) {
@@ -112,8 +155,6 @@ public class MainActivity extends AppCompatActivity {
         DrawerLayout drawer = binding.drawerLayout;
         NavigationView navigationView = binding.navView;
 
-        // Top-level destinations (hamburguesa en la barra)
-        // Incluimos tanto los de usuario como los admin; el gateo abajo evita que el admin entre a tienda.
         mAppBarConfiguration = new AppBarConfiguration.Builder(
                 R.id.nav_home,
                 R.id.listaProductos,
@@ -130,11 +171,14 @@ public class MainActivity extends AppCompatActivity {
         inflarMenuPorRol(false);
         binding.getRoot().post(this::actualizarHeaderDrawer);
         handleIntentForEditarProducto(getIntent());
+
         if (isAdminLoggedIn(this)) {
-            verificarStockBajo();
+            try { verificarStockBajo(); } catch (Exception e) {
+                Log.e("STOCK_INIT", "Error verificando stock bajo", e);
+            }
         }
 
-        // Listener del Drawer (logout + gate)
+        // Drawer listener (logout + gate)
         binding.navView.setNavigationItemSelectedListener(item -> {
             final int itemId = item.getItemId();
 
@@ -220,20 +264,26 @@ public class MainActivity extends AppCompatActivity {
             boolean ocultarToolbar = (id == R.id.login || id == R.id.registro);
             binding.appBarMain.toolbar.setVisibility(ocultarToolbar ? View.GONE : View.VISIBLE);
 
+            // —— clave: el FAB SIEMPRE se decide aquí ——
             actualizarFab(id);
         });
 
+        // Si al abrir la app ya estás logueado y caes en login, redirige y luego ajusta el FAB
         binding.getRoot().post(() -> {
             try {
                 if (navController.getCurrentDestination() != null &&
                         navController.getCurrentDestination().getId() == R.id.login &&
                         isLoggedIn()) {
                     aplicarRolYRedirigir();
+                } else if (navController.getCurrentDestination() != null) {
+                    // Inicializa el FAB acorde al destino actual para evitar “parpadeo”
+                    actualizarFab(navController.getCurrentDestination().getId());
                 }
             } catch (Exception ignored) {}
         });
 
-        binding.appBarMain.fab.show();
+        // ❌ Importante: eliminado el show forzado del FAB al final de onCreate()
+        // binding.appBarMain.fab.show();
     }
 
     @Override
@@ -250,8 +300,12 @@ public class MainActivity extends AppCompatActivity {
         inflarMenuPorRol(true);
         binding.getRoot().post(this::actualizarHeaderDrawer);
 
-        try { new DBHelper(this).borrarAlertasAntiguas24h(); } catch (Exception ignored) {}
-        if (isAdminLoggedIn(this)) verificarStockBajo();
+        try { dbHelper.borrarAlertasAntiguas24h(); } catch (Exception ignored) {}
+        if (isAdminLoggedIn(this)) {
+            try { verificarStockBajo(); } catch (Exception e) {
+                Log.e("STOCK_RESUME", "Error verificando stock bajo", e);
+            }
+        }
 
         if (navController != null && navController.getCurrentDestination() != null) {
             actualizarFab(navController.getCurrentDestination().getId());
@@ -264,8 +318,6 @@ public class MainActivity extends AppCompatActivity {
             }
         } catch (Exception ignored) {}
     }
-
-
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -289,24 +341,31 @@ public class MainActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-
     @Override
     public boolean onSupportNavigateUp() {
         return NavigationUI.navigateUp(navController, mAppBarConfiguration)
                 || super.onSupportNavigateUp();
     }
+
+    // ------------------------
+    // Sesión y Roles
+    // ------------------------
     private boolean isLoggedIn() {
         SharedPreferences sp = getSharedPreferences("sesion", Context.MODE_PRIVATE);
         return sp.getString("correo", null) != null;
     }
+
     private boolean isAdminLoggedIn(Context ctx) {
         SharedPreferences sp = ctx.getSharedPreferences("sesion", Context.MODE_PRIVATE);
         String correo = sp.getString("correo", null);
         if (correo == null) return false;
-        DBHelper dbh = new DBHelper(ctx);
-        int id = dbh.obtenerIdUsuarioPorCorreo(correo);
-        return id != 0 && dbh.esAdmin(id);
+        int id = dbHelper != null ? dbHelper.obtenerIdUsuarioPorCorreo(correo) : 0;
+        return id != 0 && dbHelper.esAdmin(id);
     }
+
+    // ------------------------
+    // Header del Drawer
+    // ------------------------
     private void actualizarHeaderDrawer() {
         if (binding == null || binding.navView == null) {
             Log.w("HEADER", "binding/navView aún no listos");
@@ -323,16 +382,16 @@ public class MainActivity extends AppCompatActivity {
         android.widget.TextView tvNombre = header.findViewById(R.id.tvNombreHeader);
         android.widget.TextView tvCorreo = header.findViewById(R.id.tvCorreoHeader);
         android.widget.TextView tvRol    = header.findViewById(R.id.tvRolHeader);
+
         SharedPreferences sp = getSharedPreferences("sesion", Context.MODE_PRIVATE);
         int idUsuario = sp.getInt("idUsuario", 0);
         String correo = sp.getString("correo", "");
         String nombre = "";
         boolean admin = false;
         try {
-            DBHelper dbh = new DBHelper(this);
             if (idUsuario != 0) {
-                nombre = dbh.obtenerNombreUsuario(idUsuario);
-                admin  = dbh.esAdmin(idUsuario);
+                nombre = dbHelper.obtenerNombreUsuario(idUsuario);
+                admin  = dbHelper.esAdmin(idUsuario);
             }
         } catch (Exception ignored) {}
 
@@ -340,6 +399,10 @@ public class MainActivity extends AppCompatActivity {
         if (tvCorreo != null) tvCorreo.setText(correo != null && !correo.isEmpty() ? correo : "—");
         if (tvRol != null)    tvRol.setText(admin ? "Administrador" : "Usuario");
     }
+
+    // ------------------------
+    // Menú por rol + badge de alertas
+    // ------------------------
     private void inflarMenuPorRol(boolean conservarSeleccionActual) {
         if (binding == null || binding.navView == null) {
             Log.w("MENU", "binding/navView no listos aún");
@@ -361,30 +424,6 @@ public class MainActivity extends AppCompatActivity {
             binding.navView.setCheckedItem(checkedItemId);
         }
         configurarBadgeAlertas();
-    }
-
-    private void actualizarFab(int destinationId) {
-        boolean ocultarFab =
-                (destinationId == R.id.dashboardKpiFragment
-                        || destinationId == R.id.listaProductos
-                        || destinationId == R.id.comprasAdmin
-                        || destinationId == R.id.alertasAdmin
-                        || destinationId == R.id.carrito
-                        || destinationId == R.id.editarProducto
-                        || destinationId == R.id.login
-                        || destinationId == R.id.registro);
-        if (ocultarFab) {
-            if (binding.appBarMain.fab.getVisibility() == View.VISIBLE) {
-                binding.appBarMain.fab.hide();
-            }
-        } else {
-            binding.appBarMain.fab.post(() -> {
-                binding.appBarMain.fab.show();
-                if (binding.appBarMain.fab.getVisibility() != View.VISIBLE) {
-                    binding.appBarMain.fab.setVisibility(View.VISIBLE);
-                }
-            });
-        }
     }
 
     private void configurarBadgeAlertas() {
@@ -413,8 +452,8 @@ public class MainActivity extends AppCompatActivity {
                     });
 
                     Runnable refreshBadge = () -> {
-                        DBHelper dbh = new DBHelper(this);
-                        int n = dbh.contarAlertas();
+                        int n = 0;
+                        try { n = dbHelper.contarAlertas(); } catch (Exception ignored) {}
                         if (badge != null) {
                             if (n > 0) {
                                 badge.setText(String.valueOf(Math.min(n, 99)));
@@ -434,6 +473,31 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    // —— NUEVO: lógica única para decidir visibilidad del FAB ——
+    private void actualizarFab(int destinationId) {
+        boolean admin = isAdminLoggedIn(this);
+
+        boolean ocultarFab =
+                FAB_HIDE_ALWAYS.contains(destinationId) ||
+                        (admin && FAB_HIDE_IF_ADMIN.contains(destinationId));
+
+        if (ocultarFab) {
+            binding.appBarMain.fab.hide();
+            // Asegura que no ocupe espacio en CoordinatorLayout/AppBar
+            binding.appBarMain.fab.setVisibility(View.GONE);
+        } else {
+            binding.appBarMain.fab.post(() -> {
+                binding.appBarMain.fab.show();
+                if (binding.appBarMain.fab.getVisibility() != View.VISIBLE) {
+                    binding.appBarMain.fab.setVisibility(View.VISIBLE);
+                }
+            });
+        }
+    }
+
+    // ------------------------
+    // Login/Redirección
+    // ------------------------
     public void aplicarRolYRedirigir() {
         boolean admin = isAdminLoggedIn(this);
         inflarMenuPorRol(false);
@@ -456,51 +520,151 @@ public class MainActivity extends AppCompatActivity {
         android.view.MenuItem target = binding.navView.getMenu().findItem(destino);
         if (target != null) binding.navView.setCheckedItem(destino);
         binding.drawerLayout.closeDrawers();
+
+        // —— clave: después de redirigir, ajusta el FAB al nuevo destino ——
+        binding.getRoot().post(() -> {
+            if (navController.getCurrentDestination() != null) {
+                actualizarFab(navController.getCurrentDestination().getId());
+            }
+        });
     }
 
     public void refrescarMenuPorRol() {
         inflarMenuPorRol(false);
     }
 
+    // ------------------------
+    // STOCK BAJO (defensivo + notificación)
+    // ------------------------
     private void verificarStockBajo() {
-        DBHelper dbh = new DBHelper(this);
-        SQLiteDatabase db = dbh.getReadableDatabase();
+        try { dbHelper.ensureTablaAlertas(); } catch (Exception ignored) {}
 
-        long hace6h = System.currentTimeMillis() - 6L * 60L * 60L * 1000L;
+        long ahora = System.currentTimeMillis();
+        long ventanaMs = 6L * 60L * 60L * 1000L; // 6 horas
+        long limiteDesde = ahora - ventanaMs;
 
-        Cursor c = db.rawQuery(
-                "SELECT nombre, cantidad_actual, cantidad_minima " +
-                        "FROM Productos WHERE cantidad_actual <= cantidad_minima", null
-        );
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        String sql = "SELECT nombre, cantidad_actual, cantidad_minima " +
+                "FROM Productos WHERE cantidad_actual <= cantidad_minima";
 
-        while (c.moveToNext()) {
-            String nombre = c.getString(0);
-            int actual = c.getInt(1);
-            int minimo = c.getInt(2);
+        Cursor c = null;
+        try {
+            c = db.rawQuery(sql, null);
+            while (c.moveToNext()) {
+                String nombre = c.getString(0);
+                int actual = c.getInt(1);
+                int minimo = c.getInt(2);
 
-            String titulo = "Stock bajo";
-            String mensaje = nombre + " (" + actual + "/" + minimo + ") requiere reabastecimiento";
+                String titulo = "Stock bajo";
+                String mensaje = nombre + " (" + actual + "/" + minimo + ") requiere reabastecimiento";
 
-            Cursor dup = db.rawQuery(
-                    "SELECT 1 FROM Alertas WHERE mensaje = ? AND creado_en > ? LIMIT 1",
-                    new String[]{mensaje, String.valueOf(hace6h)}
-            );
-            boolean existe = dup.moveToFirst();
-            dup.close();
+                if (!existeAlertaReciente(mensaje, limiteDesde)) {
+                    // Notificación real (opcional)
+                    notificarStockBajo(titulo, mensaje);
 
-            if (!existe) {
-                dbh.insertarAlerta(titulo, mensaje);
+                    registrarAlerta(titulo, mensaje);
+                }
             }
+        } catch (android.database.sqlite.SQLiteException ex) {
+            Log.e("Alertas", "Faltaba tabla Alertas. Creando y reintentando...", ex);
+            try {
+                dbHelper.ensureTablaAlertas();
+                if (c != null) c.close();
+                c = db.rawQuery(sql, null);
+                while (c.moveToNext()) {
+                    String nombre = c.getString(0);
+                    int actual = c.getInt(1);
+                    int minimo = c.getInt(2);
+                    String titulo = "Stock bajo";
+                    String mensaje = nombre + " (" + actual + "/" + minimo + ") requiere reabastecimiento";
+                    if (!existeAlertaReciente(mensaje, limiteDesde)) {
+                        notificarStockBajo(titulo, mensaje);
+                        registrarAlerta(titulo, mensaje);
+                    }
+                }
+            } catch (Exception ex2) {
+                Log.e("Alertas", "Reintento falló", ex2);
+            }
+        } catch (Exception e) {
+            Log.e("Stock", "Error verificando stock bajo", e);
+        } finally {
+            if (c != null) c.close();
         }
-
-        c.close();
-        db.close();
     }
 
-    public void registrarProducto() {
-        DBHelper base = new DBHelper(MainActivity.this);
-        SQLiteDatabase db = base.getWritableDatabase();
+    /** Devuelve true si existe una alerta con el mismo mensaje creada después de 'limiteDesdeMs'. */
+    private boolean existeAlertaReciente(String mensaje, long limiteDesdeMs) {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        String q = "SELECT 1 FROM Alertas WHERE mensaje = ? AND creado_en > ? LIMIT 1";
+        String[] args = { mensaje, String.valueOf(limiteDesdeMs) };
+        Cursor cur = null;
+        try {
+            cur = db.rawQuery(q, args);
+            return cur.moveToFirst();
+        } catch (android.database.sqlite.SQLiteException ex) {
+            try {
+                dbHelper.ensureTablaAlertas();
+                if (cur != null) cur.close();
+                cur = db.rawQuery(q, args);
+                return cur.moveToFirst();
+            } catch (Exception ex2) {
+                Log.e("Alertas", "existeAlertaReciente falló", ex2);
+                return false;
+            }
+        } finally {
+            if (cur != null) cur.close();
+        }
+    }
 
+    /** Inserta una alerta con el tiempo actual en millis. */
+    private void registrarAlerta(String titulo, String mensaje) {
+        try {
+            SQLiteDatabase dbw = dbHelper.getWritableDatabase();
+            android.content.ContentValues cv = new android.content.ContentValues();
+            cv.put("titulo", titulo);
+            cv.put("mensaje", mensaje);
+            cv.put("creado_en", System.currentTimeMillis());
+            dbw.insert("Alertas", null, cv);
+        } catch (Exception e) {
+            Log.e("Alertas", "No se pudo registrar alerta", e);
+        }
+    }
+
+    // ------------------------
+    // Notificaciones
+    // ------------------------
+    private void crearCanalNotificaciones() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel ch = new NotificationChannel(
+                    CH_STOCK,
+                    "Alertas de stock bajo",
+                    NotificationManager.IMPORTANCE_DEFAULT
+            );
+            ch.setDescription("Notificaciones cuando un producto está por debajo del mínimo");
+            NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            nm.createNotificationChannel(ch);
+        }
+    }
+
+    private void notificarStockBajo(String titulo, String mensaje) {
+        NotificationCompat.Builder b = new NotificationCompat.Builder(this, CH_STOCK)
+                .setSmallIcon(R.drawable.ic_shofy) // pon tu icono
+                .setContentTitle(titulo)
+                .setContentText(mensaje)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(mensaje))
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT);
+
+        NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        int id = (int) (System.currentTimeMillis() % Integer.MAX_VALUE);
+        nm.notify(id, b.build());
+    }
+
+    // ------------------------
+    // Utils de DB (demo)
+    // ------------------------
+    public void registrarProducto() {
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
         if (db != null) {
             Toast.makeText(this, "Base de datos creada", Toast.LENGTH_SHORT).show();
         } else {

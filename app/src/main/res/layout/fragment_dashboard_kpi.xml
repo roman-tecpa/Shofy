@@ -12,6 +12,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
+        <!-- ===== Filtro de fechas ===== -->
         <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -22,6 +23,152 @@
             app:cardElevation="6dp"
             app:cardBackgroundColor="@android:color/transparent">
 
+            <LinearLayout
+                android:orientation="vertical"
+                android:padding="16dp"
+                android:background="@drawable/bg_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <TextView
+                    android:id="@+id/tvTituloFiltroFechas"
+                    android:text="Rango de fechas"
+                    android:textStyle="bold"
+                    android:textSize="17sp"
+                    android:letterSpacing="0.02"
+                    android:textColor="#1B1B1B"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <!-- Resumen del rango actual -->
+                <TextView
+                    android:id="@+id/tvResumenRango"
+                    android:text="Hoy"
+                    android:textSize="14sp"
+                    android:textColor="#5A5A5A"
+                    android:layout_marginTop="4dp"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+
+                <!-- Rápidos: Hoy / Semana / Mes / Todo -->
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp">
+
+                    <Button
+                        android:id="@+id/btnHoy"
+                        android:text="Hoy"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1" />
+
+                    <Button
+                        android:id="@+id/btnSemana"
+                        android:text="Sem.."
+                        android:layout_marginStart="8dp"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1" />
+
+                    <Button
+                        android:id="@+id/btnMes"
+                        android:text="Mes"
+                        android:layout_marginStart="8dp"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1" />
+
+                    <Button
+                        android:id="@+id/btnTodo"
+                        android:text="Todo"
+                        android:layout_marginStart="8dp"
+                        android:layout_width="0dp"
+                        android:layout_height="40dp"
+                        android:layout_weight="1" />
+                </LinearLayout>
+
+                <!-- Selector manual: Desde / Hasta -->
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp">
+
+                    <LinearLayout
+                        android:orientation="vertical"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1">
+
+                        <TextView
+                            android:id="@+id/tvDesdeLabel"
+                            android:text="Desde"
+                            android:textSize="13sp"
+                            android:textColor="#5A5A5A"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+
+                        <Button
+                            android:id="@+id/btnDesde"
+                            android:text="Seleccionar"
+                            android:layout_width="match_parent"
+                            android:layout_height="40dp" />
+
+                        <TextView
+                            android:id="@+id/tvDesde"
+                            android:text="--/--/----"
+                            android:textSize="14sp"
+                            android:layout_marginTop="4dp"
+                            android:textColor="#1B1B1B"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
+
+                    <View
+                        android:layout_width="8dp"
+                        android:layout_height="1dp" />
+
+                    <LinearLayout
+                        android:orientation="vertical"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1">
+
+                        <TextView
+                            android:id="@+id/tvHastaLabel"
+                            android:text="Hasta"
+                            android:textSize="13sp"
+                            android:textColor="#5A5A5A"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+
+                        <Button
+                            android:id="@+id/btnHasta"
+                            android:text="Seleccionar"
+                            android:layout_width="match_parent"
+                            android:layout_height="40dp" />
+
+                        <TextView
+                            android:id="@+id/tvHasta"
+                            android:text="--/--/----"
+                            android:textSize="14sp"
+                            android:layout_marginTop="4dp"
+                            android:textColor="#1B1B1B"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Aplicar -->
+                <Button
+                    android:id="@+id/btnAplicarRango"
+                    android:text="Aplicar"
+                    android:layout_marginTop="12dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="44dp" />
+            </LinearLayout>
         </androidx.cardview.widget.CardView>
 
         <!-- ===== KPIs ===== -->
@@ -188,18 +335,26 @@
             android:padding="12dp"
             android:elevation="3dp" />
 
-        <!-- ===== Barras horizontales: Inventario/Conteo por categoría (catálogo actual) ===== -->
-        <com.github.mikephil.charting.charts.HorizontalBarChart
+        <!-- ===== Barras horizontales (luego las haremos verticales) ===== -->
+        <!-- AHORA: BARRAS VERTICALES -->
+        <com.github.mikephil.charting.charts.BarChart
             android:id="@+id/chartInvPorCategoria"
             android:layout_width="match_parent"
             android:layout_height="260dp"
-            android:layout_marginTop="16dp" />
+            android:layout_marginTop="16dp"
+            android:background="@drawable/bg_chart"
+            android:padding="12dp"
+            android:elevation="3dp" />
 
-        <com.github.mikephil.charting.charts.HorizontalBarChart
+        <com.github.mikephil.charting.charts.BarChart
             android:id="@+id/chartConteoPorCategoria"
             android:layout_width="match_parent"
             android:layout_height="260dp"
             android:layout_marginTop="16dp"
-            android:layout_marginBottom="16dp"/>
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/bg_chart"
+            android:padding="12dp"
+            android:elevation="3dp" />
+
     </LinearLayout>
 </ScrollView>

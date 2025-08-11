@@ -73,6 +73,7 @@ public class AlertasAdmin extends Fragment {
             return;
         }
 
+
         new androidx.appcompat.app.AlertDialog.Builder(requireContext())
                 .setTitle("Confirmar")
                 .setMessage("¿Seguro que deseas limpiar todo tu historial de compras?")
@@ -147,4 +148,6 @@ public class AlertasAdmin extends Fragment {
             VH(@NonNull View itemView){ super(itemView); }
         }
     }
+
+
 }

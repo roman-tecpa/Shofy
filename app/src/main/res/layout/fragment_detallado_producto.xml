@@ -10,11 +10,16 @@
         android:padding="16dp"
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:src="@drawable/shofy_completo"
+            />
 
         <!-- Imagen del producto: full width, grande y con borde redondeado -->
         <androidx.cardview.widget.CardView
-            android:layout_width="250dp"
-            android:layout_height="250dp"
+            android:layout_width="225dp"
+            android:layout_height="225dp"
             android:layout_gravity="center"
             android:layout_marginBottom="16dp"
             app:cardUseCompatPadding="true"

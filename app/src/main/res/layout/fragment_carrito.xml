@@ -7,6 +7,11 @@
     android:orientation="vertical"
     android:padding="16dp"
     android:background="#F5F7FB">
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="25dp"
+        android:src="@drawable/shofy_completo"
+        />
 
     <!-- Título -->
     <TextView

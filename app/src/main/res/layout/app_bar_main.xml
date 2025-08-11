@@ -29,6 +29,8 @@
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="@dimen/fab_margin"
         android:layout_marginBottom="16dp"
-        app:srcCompat="@drawable/ic_carrito" />
+        app:srcCompat="@drawable/ic_carrito"
+        app:backgroundTint="#4CAF50" />
+
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -9,12 +9,11 @@ import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.List;
 
 public class DBHelper extends SQLiteOpenHelper {
 
     public static final String DB_NAME = "shofy.db";
-    public static final int DB_VERSION = 5; // v5: fecha_venta_millis
+    public static final int DB_VERSION = 1; // v6: asegurar tabla Alertas + v5 fecha_venta_millis
 
     public DBHelper(@Nullable Context context) {
         super(context, DB_NAME, null, DB_VERSION);
@@ -81,34 +80,45 @@ public class DBHelper extends SQLiteOpenHelper {
                 ")");
 
         // Alertas
+        crearTablaAlertas(db);
+    }
+
+    private void crearTablaAlertas(SQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS Alertas (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT," +
                 "titulo TEXT NOT NULL," +
                 "mensaje TEXT NOT NULL," +
                 "creado_en INTEGER NOT NULL" + // epoch millis
                 ")");
-        db.execSQL("CREATE INDEX IF NOT EXISTS idx_alertas_creado_en ON Alertas(creado_en)");
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_alertas_msg_fecha ON Alertas(mensaje, creado_en)");
+    }
+
+    /** Llamable desde la app para garantizar que la tabla exista en caliente */
+    public void ensureTablaAlertas() {
+        SQLiteDatabase db = getWritableDatabase();
+        crearTablaAlertas(db);
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // Migración a v5: añadir fecha_venta_millis y backfill desde fecha_venta (UTC)
+        // v5: añadir fecha_venta_millis y backfill desde fecha_venta (UTC)
         if (oldVersion < 5) {
             try {
                 db.execSQL("ALTER TABLE Ventas ADD COLUMN fecha_venta_millis INTEGER");
             } catch (Exception ignored) { /* ya existe */ }
 
-            // Backfill: convertir TEXT UTC a epoch millis
             db.execSQL(
                     "UPDATE Ventas " +
                             "SET fecha_venta_millis = (strftime('%s', fecha_venta) * 1000) " +
                             "WHERE fecha_venta IS NOT NULL AND (fecha_venta_millis IS NULL OR fecha_venta_millis = 0)"
             );
-            return; // no reseteamos si venimos de <5
         }
 
-        // Si algún día quieres reset total, descomenta el bloque siguiente:
-        /*
+        // v6: asegurar Alertas
+        if (oldVersion < 6) {
+            crearTablaAlertas(db);
+        }
+
         db.execSQL("DROP TABLE IF EXISTS DetalleVentas");
         db.execSQL("DROP TABLE IF EXISTS Ventas");
         db.execSQL("DROP TABLE IF EXISTS Caja");
@@ -116,8 +126,19 @@ public class DBHelper extends SQLiteOpenHelper {
         db.execSQL("DROP TABLE IF EXISTS Usuarios");
         db.execSQL("DROP TABLE IF EXISTS Alertas");
         onCreate(db);
-        */
     }
+
+    @Override
+    public void onDowngrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        db.execSQL("DROP TABLE IF EXISTS DetalleVentas");
+        db.execSQL("DROP TABLE IF EXISTS Ventas");
+        db.execSQL("DROP TABLE IF EXISTS Caja");
+        db.execSQL("DROP TABLE IF EXISTS Productos");
+        db.execSQL("DROP TABLE IF EXISTS Usuarios");
+        db.execSQL("DROP TABLE IF EXISTS Alertas");
+        onCreate(db);
+    }
+
     private long startOfDayMillis(Date d) {
         java.util.Calendar cal = java.util.Calendar.getInstance();
         cal.setTime(d);
@@ -151,80 +172,24 @@ public class DBHelper extends SQLiteOpenHelper {
         return id;
     }
 
-    public java.util.ArrayList<String[]> listarAlertas() {
-        java.util.ArrayList<String[]> list = new java.util.ArrayList<>();
+    public ArrayList<String[]> listarAlertas() {
+        ArrayList<String[]> list = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor c = db.rawQuery(
                 "SELECT id, titulo, mensaje, creado_en FROM Alertas ORDER BY creado_en DESC", null
         );
         while (c.moveToNext()) {
-            list.add(new String[]{
+            list.add(new String[] {
                     String.valueOf(c.getInt(0)),
                     c.getString(1),
                     c.getString(2),
-                    String.valueOf(c.getLong(3)) // epoch millis tal cual
+                    String.valueOf(c.getLong(3))
             });
         }
         c.close();
         db.close();
         return list;
     }
-
-    // En DBHelper.java
-    public int eliminarHistorialUsuario(int idUsuario) {
-        SQLiteDatabase db = null;
-        Cursor cur = null;
-        int filasAfectadas = 0;
-
-        try {
-            db = this.getWritableDatabase();
-            db.beginTransaction();
-
-            // 1) Obtener IDs de ventas del usuario
-            cur = db.rawQuery("SELECT id FROM Ventas WHERE id_usuario = ?", new String[]{ String.valueOf(idUsuario) });
-
-            // Si no hay ventas, nada que borrar
-            if (cur.getCount() == 0) {
-                db.setTransactionSuccessful();
-                return 0;
-            }
-
-            // Construir lista de ids para IN (...)
-            StringBuilder sb = new StringBuilder();
-            List<String> args = new ArrayList<>();
-            while (cur.moveToNext()) {
-                if (sb.length() > 0) sb.append(",");
-                sb.append("?");
-                args.add(String.valueOf(cur.getInt(0)));
-            }
-            String inClause = sb.toString();
-            String[] inArgs = args.toArray(new String[0]);
-
-            // 2) Borrar detalle de todas esas ventas
-            int detallesBorrados = db.delete("DetalleVentas", "id_venta IN (" + inClause + ")", inArgs);
-
-            // 3) Borrar ventas del usuario
-            int ventasBorradas = db.delete("Ventas", "id_usuario = ?", new String[]{ String.valueOf(idUsuario) });
-
-            filasAfectadas = detallesBorrados + ventasBorradas;
-
-            db.setTransactionSuccessful();
-        } catch (Exception e) {
-            filasAfectadas = -1; // indicar error
-        } finally {
-            if (cur != null) cur.close();
-            if (db != null) db.endTransaction();
-            if (db != null && db.isOpen()) db.close();
-        }
-        return filasAfectadas;
-    }
-
-    @Override
-    public void onConfigure(SQLiteDatabase db) {
-        super.onConfigure(db);
-        db.setForeignKeyConstraintsEnabled(true); // equivalente a PRAGMA foreign_keys=ON
-    }
-
 
     public int contarAlertas() {
         SQLiteDatabase db = this.getReadableDatabase();
@@ -252,16 +217,45 @@ public class DBHelper extends SQLiteOpenHelper {
 
     // ===== Ventas =====
 
-    /** Inserta una venta con epoch millis correcto. Devuelve id de la venta. */
-    public long insertarVenta(int idUsuario, String direccionEnvio) {
-        SQLiteDatabase db = this.getWritableDatabase();
+    /** Versión TRANSACCIONAL: usa una conexión existente (NO abre/NO cierra). */
+    public long insertarVenta(SQLiteDatabase db, int idUsuario, String direccionEnvio) {
         android.content.ContentValues v = new android.content.ContentValues();
         v.put("id_usuario", idUsuario);
         v.put("direccion_envio", direccionEnvio);
         v.put("fecha_venta_millis", System.currentTimeMillis());
-        long id = db.insert("Ventas", null, v);
-        db.close();
+        return db.insert("Ventas", null, v);
+    }
+
+    /** Versión standalone: para uso FUERA de transacciones manuales. */
+    public long insertarVenta(int idUsuario, String direccionEnvio) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        long id;
+        try {
+            android.content.ContentValues v = new android.content.ContentValues();
+            v.put("id_usuario", idUsuario);
+            v.put("direccion_envio", direccionEnvio);
+            v.put("fecha_venta_millis", System.currentTimeMillis());
+            id = db.insert("Ventas", null, v);
+        } finally {
+            db.close();
+        }
         return id;
+    }
+
+    /** Inserta un renglón de detalle (usa la misma conexión de la transacción). */
+    public long insertarDetalleVenta(SQLiteDatabase db, long idVenta, int idProducto, int cantidad, double precioUnitarioConIVA) {
+        android.content.ContentValues det = new android.content.ContentValues();
+        det.put("id_venta", idVenta);
+        det.put("id_producto", idProducto);
+        det.put("cantidad_vendida", cantidad);
+        det.put("precio_venta", precioUnitarioConIVA);
+        return db.insert("DetalleVentas", null, det);
+    }
+
+    /** Descuenta stock (usa la misma conexión de la transacción). */
+    public void descontarStock(SQLiteDatabase db, int idProducto, int cantidad) {
+        db.execSQL("UPDATE Productos SET cantidad_actual = cantidad_actual - ? WHERE id = ?",
+                new Object[]{cantidad, idProducto});
     }
 
     /** Historial por usuario: SIEMPRE devuelve fecha_millis (epoch ms) listo para formatear */
@@ -319,6 +313,57 @@ public class DBHelper extends SQLiteOpenHelper {
         return idUsuario;
     }
 
+    public int eliminarHistorialUsuario(int idUsuario) {
+        SQLiteDatabase db = null;
+        Cursor cur = null;
+        int filasAfectadas = 0;
+
+        try {
+            db = this.getWritableDatabase();
+            db.beginTransaction();
+
+            // 1) IDs de ventas del usuario
+            cur = db.rawQuery("SELECT id FROM Ventas WHERE id_usuario = ?",
+                    new String[]{String.valueOf(idUsuario)});
+
+            if (!cur.moveToFirst()) {
+                db.setTransactionSuccessful();
+                return 0;
+            }
+
+            // 2) IN (?, ?, ?)
+            StringBuilder sb = new StringBuilder();
+            java.util.List<String> args = new java.util.ArrayList<>();
+            do {
+                if (sb.length() > 0) sb.append(",");
+                sb.append("?");
+                args.add(String.valueOf(cur.getInt(0)));
+            } while (cur.moveToNext());
+
+            String inClause = sb.toString();
+            String[] inArgs = args.toArray(new String[0]);
+
+            // 3) Detalles
+            int detallesBorrados = db.delete("DetalleVentas", "id_venta IN (" + inClause + ")", inArgs);
+
+            // 4) Ventas
+            int ventasBorradas = db.delete("Ventas", "id_usuario = ?", new String[]{String.valueOf(idUsuario)});
+
+            filasAfectadas = detallesBorrados + ventasBorradas;
+
+            db.setTransactionSuccessful();
+        } catch (Exception e) {
+            filasAfectadas = -1;
+        } finally {
+            if (cur != null) cur.close();
+            if (db != null) {
+                try { db.endTransaction(); } catch (Exception ignored) {}
+                if (db.isOpen()) db.close();
+            }
+        }
+        return filasAfectadas;
+    }
+
     public boolean esAdmin(int idUsuario) {
         SQLiteDatabase db = this.getReadableDatabase();
         boolean admin = false;
@@ -366,5 +411,11 @@ public class DBHelper extends SQLiteOpenHelper {
         c.close();
         db.close();
         return id;
+    }
+
+    @Override
+    public void onConfigure(SQLiteDatabase db) {
+        super.onConfigure(db);
+        db.setForeignKeyConstraintsEnabled(true); // PRAGMA foreign_keys=ON
     }
 }

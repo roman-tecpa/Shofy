@@ -27,7 +27,6 @@ import androidx.fragment.app.Fragment;
 import com.codedev.shofy.DB.DBHelper;
 import com.github.mikephil.charting.animation.Easing;
 import com.github.mikephil.charting.charts.BarChart;
-import com.github.mikephil.charting.charts.HorizontalBarChart;
 import com.github.mikephil.charting.charts.PieChart;
 import com.github.mikephil.charting.components.Description;
 import com.github.mikephil.charting.components.XAxis;
@@ -39,23 +38,39 @@ import com.github.mikephil.charting.data.BarEntry;
 
 public class DashboardKpiFragment extends Fragment {
 
+    // ===== KPIs / Vistas =====
     private TextView tvMasVendido, tvMenosVendido, tvTotalIngresos, tvPromedioUnidad;
     private BarChart chartUnidades, chartIngresos;
-    private DBHelper dbHelper;
     private PieChart chartIngresosPie;
-    private HorizontalBarChart chartInvPorCategoria, chartConteoPorCategoria;
-    private TextView tvFechaDesde, tvFechaHasta;
-    private Button btnAplicarFiltro, btnLimpiarFiltro;
 
-    private final NumberFormat currencyMx = NumberFormat.getCurrencyInstance(new Locale("es", "MX"));
+    // AHORA: también son BarChart (verticales)
+    private BarChart chartInvPorCategoria, chartConteoPorCategoria;
+
     private TextView tvInventarioPorCategoria, tvAgrupacionPorCategoria;
+
+    // ===== Filtro de fechas =====
+    private TextView tvResumenRango, tvDesde, tvHasta;
+    private Button btnHoy, btnSemana, btnMes, btnTodo, btnDesde, btnHasta, btnAplicarRango;
+
+    private DBHelper dbHelper;
+
+    // Estado del rango
+    private long desdeMs = 0L;
+    private long hastaMs = 0L;
+    private final SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
+
+    // Detección de columna fecha en Ventas
+    private boolean ventasTieneFecha = false;
+    private static final String COL_VENTAS_FECHA = "fecha_venta_millis";
+
+    // ===== Formato moneda =====
+    private final NumberFormat currencyMx = NumberFormat.getCurrencyInstance(new Locale("es", "MX"));
 
     // ===== Paletas de color =====
     private final int fondoOscuro = Color.parseColor("#121212");
     private final int grisMedio = Color.parseColor("#B3B3B3");
     private final int blanco = Color.WHITE;
 
-    // Barras
     private final int[] PALETA_BARRAS = new int[]{
             Color.parseColor("#4CAF50"),
             Color.parseColor("#2196F3"),
@@ -69,7 +84,6 @@ public class DashboardKpiFragment extends Fragment {
             Color.parseColor("#3F51B5")
     };
 
-    // Pie
     private final int[] PALETA_PIE = new int[]{
             Color.parseColor("#3F51B5"),
             Color.parseColor("#009688"),
@@ -92,8 +106,8 @@ public class DashboardKpiFragment extends Fragment {
 
         tvInventarioPorCategoria = v.findViewById(R.id.tvInventarioPorCategoria);
         tvAgrupacionPorCategoria = v.findViewById(R.id.tvAgrupacionPorCategoria);
-        chartInvPorCategoria = v.findViewById(R.id.chartInvPorCategoria);
-        chartConteoPorCategoria = v.findViewById(R.id.chartConteoPorCategoria);
+        chartInvPorCategoria = v.findViewById(R.id.chartInvPorCategoria);         // ahora BarChart
+        chartConteoPorCategoria = v.findViewById(R.id.chartConteoPorCategoria);   // ahora BarChart
 
         tvMasVendido = v.findViewById(R.id.tvMasVendido);
         tvMenosVendido = v.findViewById(R.id.tvMenosVendido);
@@ -103,7 +117,18 @@ public class DashboardKpiFragment extends Fragment {
         chartIngresos = v.findViewById(R.id.chartIngresos);
         chartIngresosPie = v.findViewById(R.id.chartIngresosPie);
 
-        // ===== Opción A: KPIs y textos en fondo claro =====
+        // Filtro de fechas (IDs del layout con el bloque que ya te pasé)
+        tvResumenRango = v.findViewById(R.id.tvResumenRango);
+        tvDesde = v.findViewById(R.id.tvDesde);
+        tvHasta = v.findViewById(R.id.tvHasta);
+        btnHoy = v.findViewById(R.id.btnHoy);
+        btnSemana = v.findViewById(R.id.btnSemana);
+        btnMes = v.findViewById(R.id.btnMes);
+        btnTodo = v.findViewById(R.id.btnTodo);
+        btnDesde = v.findViewById(R.id.btnDesde);
+        btnHasta = v.findViewById(R.id.btnHasta);
+        btnAplicarRango = v.findViewById(R.id.btnAplicarRango);
+
         int colorTextoClaro = Color.BLACK;
         if (tvMasVendido != null) tvMasVendido.setTextColor(colorTextoClaro);
         if (tvMenosVendido != null) tvMenosVendido.setTextColor(colorTextoClaro);
@@ -112,7 +137,7 @@ public class DashboardKpiFragment extends Fragment {
         if (tvInventarioPorCategoria != null) tvInventarioPorCategoria.setTextColor(colorTextoClaro);
         if (tvAgrupacionPorCategoria != null) tvAgrupacionPorCategoria.setTextColor(colorTextoClaro);
 
-        // Charts con look dark
+        // Estilo dark para TODOS los BarChart (incluye los 2 nuevos verticales)
         estilizarChartBase(chartUnidades);
         estilizarChartBase(chartIngresos);
         estilizarChartBase(chartInvPorCategoria);
@@ -120,13 +145,150 @@ public class DashboardKpiFragment extends Fragment {
         estilizarPieBase(chartIngresosPie);
 
         dbHelper = new DBHelper(requireContext());
-        cargarDatosYActualizarUI();
+        ventasTieneFecha = columnaExiste("Ventas", COL_VENTAS_FECHA);
+
+        setupRangoFechas();
+
+        // Cargas
+        cargarDatosYActualizarUI(desdeMs, hastaMs);
         cargarInventarioPorCategoria();
         cargarAgrupacionPorCategoria();
-        cargarGraficasPorCategoria();
+        cargarGraficasPorCategoria();  // ahora pinta en vertical
     }
 
-    // ===== Estilos base =====
+    // ====== Filtro de fechas ======
+    private void setupRangoFechas() {
+        setHoy();
+
+        btnHoy.setOnClickListener(v -> { setHoy(); toast("Rango: Hoy"); });
+        btnSemana.setOnClickListener(v -> { setSemanaActual(); toast("Rango: Semana actual"); });
+        btnMes.setOnClickListener(v -> { setMesActual(); toast("Rango: Mes actual"); });
+        btnTodo.setOnClickListener(v -> { setTodo(); toast("Rango: Todo"); });
+
+        btnDesde.setOnClickListener(v -> showDatePicker(true));
+        btnHasta.setOnClickListener(v -> showDatePicker(false));
+
+        btnAplicarRango.setOnClickListener(v -> {
+            if (desdeMs <= 0 || hastaMs <= 0 || desdeMs > hastaMs) {
+                toast("Selecciona un rango válido.");
+                return;
+            }
+            cargarDatosYActualizarUI(desdeMs, hastaMs);
+        });
+    }
+
+    private void setHoy() {
+        long now = System.currentTimeMillis();
+        desdeMs = startOfDay(now);
+        hastaMs = endOfDay(now);
+        actualizarLabels("Hoy");
+    }
+
+    private void setSemanaActual() {
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        cal.set(Calendar.DAY_OF_WEEK, cal.getFirstDayOfWeek());
+        desdeMs = cal.getTimeInMillis();
+
+        Calendar cal2 = Calendar.getInstance();
+        hastaMs = endOfDay(cal2.getTimeInMillis());
+
+        actualizarLabels("Semana actual");
+    }
+
+    private void setMesActual() {
+        Calendar cal = Calendar.getInstance();
+        cal.set(Calendar.DAY_OF_MONTH, 1);
+        cal.set(Calendar.HOUR_OF_DAY, 0);
+        cal.set(Calendar.MINUTE, 0);
+        cal.set(Calendar.SECOND, 0);
+        cal.set(Calendar.MILLISECOND, 0);
+        desdeMs = cal.getTimeInMillis();
+
+        Calendar cal2 = Calendar.getInstance();
+        hastaMs = endOfDay(cal2.getTimeInMillis());
+
+        actualizarLabels("Mes actual");
+    }
+
+    private void setTodo() {
+        desdeMs = 0L;
+        hastaMs = System.currentTimeMillis();
+        actualizarLabels("Todo");
+    }
+
+    private void actualizarLabels(String resumen) {
+        if (tvResumenRango != null) tvResumenRango.setText(resumen);
+        if (tvDesde != null) tvDesde.setText(desdeMs == 0 ? "--/--/----" : sdf.format(new Date(desdeMs)));
+        if (tvHasta != null) tvHasta.setText(hastaMs == 0 ? "--/--/----" : sdf.format(new Date(hastaMs)));
+    }
+
+    private void showDatePicker(boolean esDesde) {
+        final Calendar cal = Calendar.getInstance();
+        int y = cal.get(Calendar.YEAR);
+        int m = cal.get(Calendar.MONTH);
+        int d = cal.get(Calendar.DAY_OF_MONTH);
+
+        DatePickerDialog dlg = new DatePickerDialog(
+                getContext(),
+                (view, year, month, dayOfMonth) -> {
+                    Calendar c = Calendar.getInstance();
+                    c.set(Calendar.YEAR, year);
+                    c.set(Calendar.MONTH, month);
+                    c.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+
+                    long ms = esDesde ? startOfDay(c.getTimeInMillis()) : endOfDay(c.getTimeInMillis());
+                    if (esDesde) { desdeMs = ms; } else { hastaMs = ms; }
+                    actualizarLabels("Rango manual");
+                },
+                y, m, d
+        );
+        dlg.show();
+    }
+
+    private long startOfDay(long ms) {
+        Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(ms);
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        return c.getTimeInMillis();
+    }
+
+    private long endOfDay(long ms) {
+        Calendar c = Calendar.getInstance();
+        c.setTimeInMillis(ms);
+        c.set(Calendar.HOUR_OF_DAY, 23);
+        c.set(Calendar.MINUTE, 59);
+        c.set(Calendar.SECOND, 59);
+        c.set(Calendar.MILLISECOND, 999);
+        return c.getTimeInMillis();
+    }
+
+    private boolean columnaExiste(String tabla, String columna) {
+        boolean existe = false;
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+        Cursor c = null;
+        try {
+            c = db.rawQuery("PRAGMA table_info(" + tabla + ")", null);
+            while (c.moveToNext()) {
+                String name = c.getString(c.getColumnIndexOrThrow("name"));
+                if (columna.equalsIgnoreCase(name)) { existe = true; break; }
+            }
+        } catch (Exception ignored) { }
+        finally { if (c != null) c.close(); db.close(); }
+        return existe;
+    }
+
+    private void toast(String msg) {
+        android.widget.Toast.makeText(getContext(), msg, android.widget.Toast.LENGTH_SHORT).show();
+    }
+
+    // ===== Estilos base para BarChart =====
     private void estilizarChartBase(BarChart chart) {
         chart.setBackgroundColor(fondoOscuro);
         chart.setDrawGridBackground(false);
@@ -146,26 +308,6 @@ public class DashboardKpiFragment extends Fragment {
         x.setDrawGridLines(false);
     }
 
-    private void estilizarChartBase(HorizontalBarChart chart) {
-        chart.setBackgroundColor(fondoOscuro);
-        chart.setDrawGridBackground(false);
-        chart.getLegend().setTextColor(blanco);
-        chart.getDescription().setEnabled(false);
-
-        chart.getAxisRight().setEnabled(false);
-        chart.getAxisLeft().setTextColor(blanco);
-        chart.getAxisLeft().setGridColor(Color.parseColor("#2A2A2A"));
-        chart.getAxisLeft().setAxisLineColor(grisMedio);
-
-        XAxis x = chart.getXAxis();
-        x.setTextColor(blanco);
-        x.setGridColor(Color.parseColor("#2A2A2A"));
-        x.setAxisLineColor(grisMedio);
-        x.setPosition(XAxis.XAxisPosition.BOTTOM);
-        x.setDrawGridLines(false);
-        chart.setFitBars(true);
-    }
-
     private void estilizarPieBase(PieChart pie) {
         pie.setUsePercentValues(false);
         pie.setDrawEntryLabels(true);
@@ -183,33 +325,32 @@ public class DashboardKpiFragment extends Fragment {
         pie.setExtraOffsets(6f, 6f, 6f, 6f);
     }
 
-    private void pintarHorizontalBarChart(HorizontalBarChart chart,
+    // ===== Barras verticales por categoría =====
+    private void pintarBarChartCategorias(BarChart chart,
                                           List<String> labels,
                                           List<Float> values,
                                           String titulo,
                                           boolean mostrarEnteros) {
         int limit = Math.min(labels.size(), 10);
-        List<com.github.mikephil.charting.data.BarEntry> entries = new ArrayList<>();
-        List<String> yLabels = new ArrayList<>();
+        List<BarEntry> entries = new ArrayList<>();
+        List<String> xLabels = new ArrayList<>();
         for (int i = 0; i < limit; i++) {
-            entries.add(new com.github.mikephil.charting.data.BarEntry(i, values.get(i)));
-            yLabels.add(labels.get(i));
+            entries.add(new BarEntry(i, values.get(i)));
+            xLabels.add(labels.get(i));
         }
 
-        com.github.mikephil.charting.data.BarDataSet dataSet =
-                new com.github.mikephil.charting.data.BarDataSet(entries, titulo);
+        BarDataSet dataSet = new BarDataSet(entries, titulo);
         dataSet.setDrawValues(true);
         dataSet.setColors(PALETA_BARRAS);
         dataSet.setValueTextColor(blanco);
         dataSet.setValueTextSize(12f);
 
-        com.github.mikephil.charting.data.BarData data =
-                new com.github.mikephil.charting.data.BarData(dataSet);
+        BarData data = new BarData(dataSet);
         data.setBarWidth(0.6f);
+
         if (mostrarEnteros) {
-            data.setValueFormatter(new com.github.mikephil.charting.formatter.ValueFormatter() {
-                @Override
-                public String getFormattedValue(float value) {
+            data.setValueFormatter(new ValueFormatter() {
+                @Override public String getFormattedValue(float value) {
                     return String.valueOf(Math.round(value));
                 }
             });
@@ -219,28 +360,25 @@ public class DashboardKpiFragment extends Fragment {
         chart.setFitBars(true);
         chart.getAxisRight().setEnabled(false);
 
-        com.github.mikephil.charting.components.XAxis xAxis = chart.getXAxis();
-        xAxis.setPosition(com.github.mikephil.charting.components.XAxis.XAxisPosition.BOTTOM);
+        // Eje Y (valores)
+        chart.getAxisLeft().setGranularity(1f);
+        chart.getAxisLeft().setTextColor(blanco);
+        chart.getAxisLeft().setGridColor(Color.parseColor("#2A2A2A"));
+        chart.getAxisLeft().setAxisLineColor(grisMedio);
+
+        // Eje X (categorías)
+        XAxis xAxis = chart.getXAxis();
+        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
         xAxis.setGranularity(1f);
+        xAxis.setValueFormatter(new IndexAxisValueFormatter(xLabels));
+        xAxis.setLabelRotationAngle(315f); // rotación para etiquetas largas
         xAxis.setDrawGridLines(false);
         xAxis.setTextColor(blanco);
         xAxis.setAxisLineColor(grisMedio);
 
-        com.github.mikephil.charting.components.YAxis yLeft = chart.getAxisLeft();
-        yLeft.setGranularity(1f);
-        yLeft.setValueFormatter(new com.github.mikephil.charting.formatter.IndexAxisValueFormatter(yLabels));
-        yLeft.setDrawGridLines(false);
-        yLeft.setTextColor(blanco);
-        yLeft.setAxisLineColor(grisMedio);
-
-        chart.getAxisRight().setEnabled(false);
-
-        chart.getLegend().setEnabled(true);
+        chart.setBackgroundColor(fondoOscuro);
         chart.getLegend().setTextColor(blanco);
-
-        Description desc = new Description();
-        desc.setText("");
-        chart.setDescription(desc);
+        chart.getDescription().setEnabled(false);
 
         chart.animateY(1000, Easing.EaseInOutQuad);
         chart.invalidate();
@@ -268,7 +406,7 @@ public class DashboardKpiFragment extends Fragment {
         c1.close();
         db1.close();
 
-        pintarHorizontalBarChart(
+        pintarBarChartCategorias(
                 chartInvPorCategoria,
                 labelsInv,
                 valoresInv,
@@ -297,7 +435,7 @@ public class DashboardKpiFragment extends Fragment {
         c2.close();
         db2.close();
 
-        pintarHorizontalBarChart(
+        pintarBarChartCategorias(
                 chartConteoPorCategoria,
                 labelsCount,
                 valoresCount,
@@ -306,8 +444,8 @@ public class DashboardKpiFragment extends Fragment {
         );
     }
 
-    private void cargarDatosYActualizarUI() {
-        // Agregados por producto
+    // ==== Carga principal con (opcional) filtro de fechas ====
+    private void cargarDatosYActualizarUI(long desde, long hasta) {
         List<String> labels = new ArrayList<>();
         List<Float> unidadesList = new ArrayList<>();
         List<Float> ingresosList = new ArrayList<>();
@@ -323,15 +461,32 @@ public class DashboardKpiFragment extends Fragment {
 
         SQLiteDatabase db = dbHelper.getReadableDatabase();
 
-        Cursor c = db.rawQuery(
-                "SELECT p.nombre, " +
-                        "IFNULL(SUM(dv.cantidad_vendida), 0) AS unidades, " +
-                        "IFNULL(SUM(dv.cantidad_vendida * dv.precio_venta), 0.0) AS ingresos " +
-                        "FROM Productos p " +
-                        "LEFT JOIN DetalleVentas dv ON dv.id_producto = p.id " +
-                        "GROUP BY p.id, p.nombre " +
-                        "ORDER BY unidades DESC, p.nombre ASC", null);
+        String sql;
+        String[] args;
 
+        if (ventasTieneFecha && desde > 0 && hasta > 0) {
+            sql = "SELECT p.nombre, " +
+                    "IFNULL(SUM(dv.cantidad_vendida), 0) AS unidades, " +
+                    "IFNULL(SUM(dv.cantidad_vendida * dv.precio_venta), 0.0) AS ingresos " +
+                    "FROM Productos p " +
+                    "LEFT JOIN DetalleVentas dv ON dv.id_producto = p.id " +
+                    "LEFT JOIN Ventas v ON v.id = dv.id_venta " +
+                    "WHERE v." + COL_VENTAS_FECHA + " BETWEEN ? AND ? " +
+                    "GROUP BY p.id, p.nombre " +
+                    "ORDER BY unidades DESC, p.nombre ASC";
+            args = new String[]{ String.valueOf(desde), String.valueOf(hasta) };
+        } else {
+            sql = "SELECT p.nombre, " +
+                    "IFNULL(SUM(dv.cantidad_vendida), 0) AS unidades, " +
+                    "IFNULL(SUM(dv.cantidad_vendida * dv.precio_venta), 0.0) AS ingresos " +
+                    "FROM Productos p " +
+                    "LEFT JOIN DetalleVentas dv ON dv.id_producto = p.id " +
+                    "GROUP BY p.id, p.nombre " +
+                    "ORDER BY unidades DESC, p.nombre ASC";
+            args = null;
+        }
+
+        Cursor c = db.rawQuery(sql, args);
         while (c.moveToNext()) {
             String nombre = c.getString(0);
             int unidades = c.getInt(1);
@@ -356,22 +511,18 @@ public class DashboardKpiFragment extends Fragment {
         c.close();
         db.close();
 
-        // KPIs
         tvMasVendido.setText("Producto más vendido: " + masVendidoNombre + " (" + (masVendidoUnidades == Integer.MIN_VALUE ? 0 : masVendidoUnidades) + ")");
         tvMenosVendido.setText("Producto menos vendido: " + menosVendidoNombre + " (" + (menosVendidoUnidades == Integer.MAX_VALUE ? 0 : menosVendidoUnidades) + ")");
         tvTotalIngresos.setText("Total ingresos: " + currencyMx.format(totalIngresos));
         double promedio = (totalUnidades == 0) ? 0.0 : (totalIngresos / totalUnidades);
         tvPromedioUnidad.setText("Promedio por unidad: " + currencyMx.format(promedio));
 
-        // Gráfica: Unidades por producto (Top 10)
         pintarBarChart(chartUnidades, labels, unidadesList, "Unidades por producto (Top 10)", true);
-
-        // Gráfica: Ingresos por producto (Top 10)
         pintarBarChart(chartIngresos, labels, ingresosList, "Ingresos por producto (Top 10)", false);
-
-        // Pie: Top N ingresos
         pintarPieChartTopIngresos(chartIngresosPie, labels, ingresosList, 5);
     }
+
+    private void cargarDatosYActualizarUI() { cargarDatosYActualizarUI(desdeMs, hastaMs); }
 
     private void pintarBarChart(BarChart chart, List<String> labels, List<Float> values, String titulo, boolean enteros) {
         int limit = Math.min(labels.size(), 10);
@@ -391,15 +542,13 @@ public class DashboardKpiFragment extends Fragment {
         data.setBarWidth(0.6f);
         if (enteros) {
             data.setValueFormatter(new ValueFormatter() {
-                @Override
-                public String getFormattedValue(float value) {
+                @Override public String getFormattedValue(float value) {
                     return String.valueOf(Math.round(value));
                 }
             });
         } else {
             data.setValueFormatter(new ValueFormatter() {
-                @Override
-                public String getFormattedValue(float value) {
+                @Override public String getFormattedValue(float value) {
                     if (value >= 1000f) return String.valueOf(Math.round(value));
                     return String.format(Locale.US, "%.2f", value);
                 }
@@ -467,8 +616,7 @@ public class DashboardKpiFragment extends Fragment {
 
         final float totalTopFinal = totalTop;
         data.setValueFormatter(new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
+            @Override public String getFormattedValue(float value) {
                 if (totalTopFinal <= 0.0001f) return "0%";
                 float pct = (value / totalTopFinal) * 100f;
                 return String.format(Locale.US, "%.0f%%", pct);

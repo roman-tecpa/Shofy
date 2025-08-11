@@ -6,6 +6,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.database.sqlite.SQLiteDatabase;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -28,6 +29,7 @@ import com.codedev.shofy.models.DialogCompraRealizada;
 import com.codedev.shofy.models.ItemCarrito;
 import com.codedev.shofy.models.Producto;
 import com.codedev.shofy.utils.CarritoManager;
+import com.codedev.shofy.utils.PrefsDireccion;
 
 import java.util.List;
 
@@ -39,26 +41,20 @@ public class Carrito extends Fragment {
     private Button btnRealizarPedido, btnEditarDireccion;
     private CarritoAdapter adapter;
 
-    // Preferencias
-    private SharedPreferences sharedPreferences;
-    private static final String PREFS_NAME = "MisPreferencias";
-    private static final String CLAVE_DIRECCION = "direccion_envio";
-
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_carrito, container, false);
 
         // Inicializar vistas
-        recyclerCarrito = view.findViewById(R.id.recyclerCarrito);
-        txtSubtotal = view.findViewById(R.id.txtSubtotal);
-        txtIVA = view.findViewById(R.id.txtIVA);
-        txtTotal = view.findViewById(R.id.txtTotal);
-        txtDireccionEnvio = view.findViewById(R.id.txtDireccionEnvio);
-        btnEditarDireccion = view.findViewById(R.id.btnEditarDireccion);
-        btnRealizarPedido = view.findViewById(R.id.btnRealizarPedido);
+        recyclerCarrito      = view.findViewById(R.id.recyclerCarrito);
+        txtSubtotal          = view.findViewById(R.id.txtSubtotal);
+        txtIVA               = view.findViewById(R.id.txtIVA);
+        txtTotal             = view.findViewById(R.id.txtTotal);
+        txtDireccionEnvio    = view.findViewById(R.id.txtDireccionEnvio);
+        btnEditarDireccion   = view.findViewById(R.id.btnEditarDireccion);
+        btnRealizarPedido    = view.findViewById(R.id.btnRealizarPedido);
 
-        // Preferencias
-        sharedPreferences = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        // Dirección actual por usuario
         cargarDireccionGuardada();
 
         // Eventos
@@ -76,11 +72,11 @@ public class Carrito extends Fragment {
     }
 
     // ---------------------------------------
-    // DIRECCIÓN
+    // DIRECCIÓN (per-usuario)
     // ---------------------------------------
     private void cargarDireccionGuardada() {
-        String direccion = sharedPreferences.getString(CLAVE_DIRECCION, "");
-        if (!direccion.isEmpty()) {
+        String direccion = PrefsDireccion.obtenerDireccion(requireContext());
+        if (!TextUtils.isEmpty(direccion)) {
             txtDireccionEnvio.setText("Dirección de envío: " + direccion);
         } else {
             txtDireccionEnvio.setText("Dirección de envío: No agregada");
@@ -91,7 +87,11 @@ public class Carrito extends Fragment {
         Context context = requireContext();
         EditText input = new EditText(context);
         input.setHint("Escribe tu dirección");
-        input.setText(sharedPreferences.getString(CLAVE_DIRECCION, ""));
+
+        String direccionActual = PrefsDireccion.obtenerDireccion(context);
+        if (!TextUtils.isEmpty(direccionActual)) {
+            input.setText(direccionActual);
+        }
 
         new AlertDialog.Builder(context)
                 .setTitle("Dirección de envío")
@@ -99,7 +99,7 @@ public class Carrito extends Fragment {
                 .setPositiveButton("Guardar", (dialog, which) -> {
                     String nuevaDireccion = input.getText().toString().trim();
                     if (!nuevaDireccion.isEmpty()) {
-                        sharedPreferences.edit().putString(CLAVE_DIRECCION, nuevaDireccion).apply();
+                        PrefsDireccion.guardarDireccion(context, nuevaDireccion);
                         txtDireccionEnvio.setText("Dirección de envío: " + nuevaDireccion);
                         Toast.makeText(context, "Dirección guardada", Toast.LENGTH_SHORT).show();
                     } else {
@@ -122,34 +122,31 @@ public class Carrito extends Fragment {
             return;
         }
 
-        // Validar dirección
-        String direccion = sharedPreferences.getString(CLAVE_DIRECCION, null);
+        String direccion = com.codedev.shofy.utils.PrefsDireccion.obtenerDireccion(context);
         if (direccion == null || direccion.trim().isEmpty()) {
             Toast.makeText(context, "Por favor agrega una dirección de envío antes de continuar.", Toast.LENGTH_LONG).show();
             return;
         }
 
-        // Validar carrito
-        List<ItemCarrito> carritoItems = CarritoManager.getInstancia().getItems();
+        List<ItemCarrito> carritoItems = com.codedev.shofy.utils.CarritoManager.getInstancia().getItems();
         if (carritoItems.isEmpty()) {
             Toast.makeText(context, "El carrito está vacío", Toast.LENGTH_SHORT).show();
             return;
         }
 
         DBHelper dbHelper = new DBHelper(context);
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        SQLiteDatabase db = null;
+        long idVenta = -1;
 
-        db.beginTransaction();
         try {
-            // Insertar venta con dirección
-            ContentValues ventaValues = new ContentValues();
-            ventaValues.put("id_usuario", idUsuario);
-            ventaValues.put("direccion_envio", direccion); // 👈 Guardar dirección en BD
-            long idVenta = db.insert("Ventas", null, ventaValues);
+            db = dbHelper.getWritableDatabase();
+            db.beginTransaction();
 
-            if (idVenta == -1) throw new Exception("No se pudo registrar la venta");
+            // 1) Insertar venta usando la MISMA conexión
+            idVenta = dbHelper.insertarVenta(db, idUsuario, direccion);
+            if (idVenta <= 0) throw new Exception("No se pudo registrar la venta");
 
-            // Detalles de productos
+            // 2) Detalles + stock usando la MISMA conexión
             for (ItemCarrito item : carritoItems) {
                 Producto producto = item.getProducto();
                 int cantidad = item.getCantidad();
@@ -160,23 +157,15 @@ public class Carrito extends Fragment {
 
                 double precioUnitarioConIVA = producto.getPrecioBase() * (1 + obtenerIVA(producto.getTipo()));
 
-                ContentValues detalle = new ContentValues();
-                detalle.put("id_venta", idVenta);
-                detalle.put("id_producto", producto.getId());
-                detalle.put("cantidad_vendida", cantidad);
-                detalle.put("precio_venta", precioUnitarioConIVA);
+                long idDet = dbHelper.insertarDetalleVenta(db, idVenta, producto.getId(), cantidad, precioUnitarioConIVA);
+                if (idDet == -1) throw new Exception("No se pudo registrar el detalle de venta");
 
-                long idDetalle = db.insert("DetalleVentas", null, detalle);
-                if (idDetalle == -1) throw new Exception("No se pudo registrar el detalle de venta");
-
-                // Actualizar stock
-                db.execSQL("UPDATE Productos SET cantidad_actual = cantidad_actual - ? WHERE id = ?",
-                        new Object[]{cantidad, producto.getId()});
+                dbHelper.descontarStock(db, producto.getId(), cantidad);
             }
 
             db.setTransactionSuccessful();
-            Toast.makeText(context, "Venta registrada con éxito", Toast.LENGTH_SHORT).show();
 
+            Toast.makeText(context, "Venta registrada con éxito", Toast.LENGTH_SHORT).show();
             DialogCompraRealizada dialog = new DialogCompraRealizada();
             dialog.show(getParentFragmentManager(), "compra_realizada");
 
@@ -185,14 +174,16 @@ public class Carrito extends Fragment {
             Toast.makeText(context, "Error al registrar la venta: " + e.getMessage(), Toast.LENGTH_LONG).show();
             return;
         } finally {
-            db.endTransaction();
-            db.close();
+            if (db != null) {
+                try { db.endTransaction(); } catch (Exception ignored) {}
+                try { db.close(); } catch (Exception ignored) {}
+            }
         }
 
         // Limpiar carrito y actualizar vista
-        CarritoManager.getInstancia().limpiarCarrito();
+        com.codedev.shofy.utils.CarritoManager.getInstancia().limpiarCarrito();
         if (adapter != null) adapter.notifyDataSetChanged();
-        calcularYMostrarResumen(CarritoManager.getInstancia().getItems());
+        calcularYMostrarResumen(com.codedev.shofy.utils.CarritoManager.getInstancia().getItems());
 
         // Redirigir al home
         Bundle args = new Bundle();
@@ -208,7 +199,6 @@ public class Carrito extends Fragment {
     private int obtenerIdUsuario() {
         Context context = getContext();
         if (context == null) return 0;
-
         SharedPreferences preferences = context.getSharedPreferences("sesion", Context.MODE_PRIVATE);
         return preferences.getInt("idUsuario", 0);
     }
@@ -239,10 +229,10 @@ public class Carrito extends Fragment {
 
     private double obtenerIVA(String tipo) {
         switch (tipo) {
-            case "Papelería": return 0.16;
-            case "Supermercado": return 0.04;
-            case "Droguería": return 0.12;
-            default: return 0.0;
+            case "Papelería":   return 0.16;
+            case "Supermercado":return 0.04;
+            case "Droguería":   return 0.12;
+            default:            return 0.0;
         }
     }
 
@@ -251,9 +241,8 @@ public class Carrito extends Fragment {
         String correo = sp.getString("correo", null);
         if (correo == null) return false;
 
-        com.codedev.shofy.DB.DBHelper dbh = new com.codedev.shofy.DB.DBHelper(ctx);
+        DBHelper dbh = new DBHelper(ctx);
         int id = dbh.obtenerIdUsuarioPorCorreo(correo);
         return id != 0 && dbh.esAdmin(id);
     }
-
 }
