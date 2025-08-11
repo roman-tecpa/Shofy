@@ -42,14 +42,24 @@
             <TextView
                 android:id="@+id/txtPrecio"
                 android:text="$0.00"
-                android:textSize="14sp"
+                android:textSize="18sp"
                 android:textStyle="bold"
-                android:textColor="#065F46"
+                android:textColor="#4CAF50"
                 android:background="@drawable/bg_dialog"
                 android:paddingLeft="10dp"
                 android:paddingRight="10dp"
                 android:paddingTop="4dp"
                 android:paddingBottom="4dp"
+                android:layout_marginTop="4dp"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+
+            <!-- Unidades disponibles -->
+            <TextView
+                android:id="@+id/txtUnidades"
+                android:text="Unidades: 0"
+                android:textSize="14sp"
+                android:textColor="#555555"
                 android:layout_marginTop="4dp"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content" />

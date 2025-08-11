@@ -7,29 +7,64 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 import androidx.annotation.Nullable;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Locale;
+import java.util.TimeZone;
 
 public class DBHelper extends SQLiteOpenHelper {
 
     public static final String DB_NAME = "shofy.db";
-    public static final int DB_VERSION = 1; // v6: asegurar tabla Alertas + v5 fecha_venta_millis
+    // Sube versión para aplicar defaults e índices sin borrar datos
+    public static final int DB_VERSION = 7; // v7: defaults UTC + índice fecha
 
     public DBHelper(@Nullable Context context) {
         super(context, DB_NAME, null, DB_VERSION);
     }
 
-    public void resetProductos() {
-        SQLiteDatabase db = this.getWritableDatabase();
-        db.execSQL("DELETE FROM Productos");
-        db.execSQL("DELETE FROM sqlite_sequence WHERE name='Productos'");
-        db.close();
+    // ============ UTILIDADES DE TIEMPO (UTC) ============
+
+    /** Devuelve ahora en epoch ms (UTC) y en ISO-8601 UTC "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'". */
+    private static class NowPair {
+        final long epochMs;
+        final String isoUtc;
+        NowPair(long epochMs, String isoUtc) { this.epochMs = epochMs; this.isoUtc = isoUtc; }
     }
+
+    private static NowPair nowUtc() {
+        long ms = System.currentTimeMillis(); // tiempo del dispositivo; asúmelo en UTC para epoch
+        SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
+        f.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return new NowPair(ms, f.format(new Date(ms)));
+    }
+
+    private long startOfDayMillis(Date d) {
+        java.util.Calendar cal = java.util.Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        cal.setTime(d);
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
+        cal.set(java.util.Calendar.MINUTE, 0);
+        cal.set(java.util.Calendar.SECOND, 0);
+        cal.set(java.util.Calendar.MILLISECOND, 0);
+        return cal.getTimeInMillis();
+    }
+
+    private long endOfDayMillis(Date d) {
+        java.util.Calendar cal = java.util.Calendar.getInstance(TimeZone.getTimeZone("UTC"));
+        cal.setTime(d);
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 23);
+        cal.set(java.util.Calendar.MINUTE, 59);
+        cal.set(java.util.Calendar.SECOND, 59);
+        cal.set(java.util.Calendar.MILLISECOND, 999);
+        return cal.getTimeInMillis();
+    }
+
+    // ============ CREACIÓN DE ESQUEMA ============
 
     @Override
     public void onCreate(SQLiteDatabase db) {
         // Usuarios
-        db.execSQL("CREATE TABLE Usuarios (" +
+        db.execSQL("CREATE TABLE IF NOT EXISTS Usuarios (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "nombre TEXT NOT NULL, " +
                 "correo TEXT UNIQUE NOT NULL, " +
@@ -37,11 +72,11 @@ public class DBHelper extends SQLiteOpenHelper {
                 "rol TEXT NOT NULL" +
                 ")");
 
-        db.execSQL("INSERT INTO Usuarios (nombre, correo, contrasena, rol) VALUES " +
+        db.execSQL("INSERT OR IGNORE INTO Usuarios (nombre, correo, contrasena, rol) VALUES " +
                 "('Admin', 'admin@admin.com', 'admin123', 'admin')");
 
         // Productos
-        db.execSQL("CREATE TABLE Productos (" +
+        db.execSQL("CREATE TABLE IF NOT EXISTS Productos (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "nombre TEXT UNIQUE NOT NULL, " +
                 "descripcion TEXT NOT NULL, " +
@@ -51,32 +86,39 @@ public class DBHelper extends SQLiteOpenHelper {
                 "precio_base REAL NOT NULL" +
                 ")");
 
-        // Ventas (incluye fecha_venta legado y nueva fecha_venta_millis)
-        db.execSQL("CREATE TABLE Ventas (" +
+        // Ventas
+        // Guardamos dos campos de tiempo SINCRONIZADOS:
+        // - fecha_venta: ISO-8601 UTC como TEXT (lectura humana y ordenación estable)
+        // - fecha_venta_millis: epoch ms (cálculo rápido)
+        db.execSQL("CREATE TABLE IF NOT EXISTS Ventas (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "id_usuario INTEGER NOT NULL, " +
                 "direccion_envio TEXT, " +
-                "fecha_venta DATETIME DEFAULT CURRENT_TIMESTAMP, " + // UTC (legado)
-                "fecha_venta_millis INTEGER, " +                     // epoch ms (nuevo)
-                "FOREIGN KEY(id_usuario) REFERENCES Usuarios(id)" +
+                // Defaults en SQLite por si no enviamos explícito desde app
+                "fecha_venta TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')), " +
+                "fecha_venta_millis INTEGER NOT NULL DEFAULT (unixepoch('now')*1000), " +
+                "FOREIGN KEY(id_usuario) REFERENCES Usuarios(id) ON DELETE CASCADE" +
                 ")");
 
+        // Índice por fecha para historiales
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_ventas_fecha ON Ventas(fecha_venta_millis DESC)");
+
         // DetalleVentas
-        db.execSQL("CREATE TABLE DetalleVentas (" +
+        db.execSQL("CREATE TABLE IF NOT EXISTS DetalleVentas (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "id_venta INTEGER NOT NULL, " +
                 "id_producto INTEGER NOT NULL, " +
                 "cantidad_vendida INTEGER NOT NULL, " +
                 "precio_venta REAL NOT NULL, " +
-                "FOREIGN KEY(id_venta) REFERENCES Ventas(id), " +
-                "FOREIGN KEY(id_producto) REFERENCES Productos(id)" +
+                "FOREIGN KEY(id_venta) REFERENCES Ventas(id) ON DELETE CASCADE, " +
+                "FOREIGN KEY(id_producto) REFERENCES Productos(id) ON DELETE CASCADE" +
                 ")");
 
         // Caja
-        db.execSQL("CREATE TABLE Caja (" +
+        db.execSQL("CREATE TABLE IF NOT EXISTS Caja (" +
                 "id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                 "monto_total REAL NOT NULL, " +
-                "fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP" +
+                "fecha_actualizacion TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))" +
                 ")");
 
         // Alertas
@@ -97,21 +139,24 @@ public class DBHelper extends SQLiteOpenHelper {
     public void ensureTablaAlertas() {
         SQLiteDatabase db = getWritableDatabase();
         crearTablaAlertas(db);
+        db.close();
     }
+
+    // ============ MIGRACIONES ============
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // v5: añadir fecha_venta_millis y backfill desde fecha_venta (UTC)
+        // v5: añadir fecha_venta_millis si no existe y backfill desde fecha_venta
         if (oldVersion < 5) {
             try {
                 db.execSQL("ALTER TABLE Ventas ADD COLUMN fecha_venta_millis INTEGER");
-            } catch (Exception ignored) { /* ya existe */ }
-
-            db.execSQL(
-                    "UPDATE Ventas " +
-                            "SET fecha_venta_millis = (strftime('%s', fecha_venta) * 1000) " +
-                            "WHERE fecha_venta IS NOT NULL AND (fecha_venta_millis IS NULL OR fecha_venta_millis = 0)"
-            );
+            } catch (Exception ignored) {}
+            // Intentar poblar desde fecha_venta si existía en formato reconocible por SQLite
+            try {
+                db.execSQL("UPDATE Ventas " +
+                        "SET fecha_venta_millis = COALESCE(fecha_venta_millis, strftime('%s', fecha_venta)*1000) " +
+                        "WHERE fecha_venta IS NOT NULL");
+            } catch (Exception ignored) {}
         }
 
         // v6: asegurar Alertas
@@ -119,47 +164,33 @@ public class DBHelper extends SQLiteOpenHelper {
             crearTablaAlertas(db);
         }
 
-        db.execSQL("DROP TABLE IF EXISTS DetalleVentas");
-        db.execSQL("DROP TABLE IF EXISTS Ventas");
-        db.execSQL("DROP TABLE IF EXISTS Caja");
-        db.execSQL("DROP TABLE IF EXISTS Productos");
-        db.execSQL("DROP TABLE IF EXISTS Usuarios");
-        db.execSQL("DROP TABLE IF EXISTS Alertas");
-        onCreate(db);
+        // v7: asegurar defaults e índice de Ventas sin borrar datos
+        if (oldVersion < 7) {
+            db.execSQL("CREATE INDEX IF NOT EXISTS idx_ventas_fecha ON Ventas(fecha_venta_millis DESC)");
+            // Si hay filas sin ISO, generarlo desde millis (cuando sea posible)
+            try {
+                db.execSQL("UPDATE Ventas " +
+                        "SET fecha_venta = COALESCE(fecha_venta, strftime('%Y-%m-%dT%H:%M:%fZ', fecha_venta_millis/1000)) " +
+                        "WHERE fecha_venta IS NULL OR fecha_venta = ''");
+            } catch (Exception ignored) {}
+        }
     }
 
     @Override
     public void onDowngrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS DetalleVentas");
-        db.execSQL("DROP TABLE IF EXISTS Ventas");
-        db.execSQL("DROP TABLE IF EXISTS Caja");
-        db.execSQL("DROP TABLE IF EXISTS Productos");
-        db.execSQL("DROP TABLE IF EXISTS Usuarios");
-        db.execSQL("DROP TABLE IF EXISTS Alertas");
-        onCreate(db);
+        // Evita borrar datos en downgrade. Solo mantén integridad mínima.
+        super.onDowngrade(db, oldVersion, newVersion);
     }
 
-    private long startOfDayMillis(Date d) {
-        java.util.Calendar cal = java.util.Calendar.getInstance();
-        cal.setTime(d);
-        cal.set(java.util.Calendar.HOUR_OF_DAY, 0);
-        cal.set(java.util.Calendar.MINUTE, 0);
-        cal.set(java.util.Calendar.SECOND, 0);
-        cal.set(java.util.Calendar.MILLISECOND, 0);
-        return cal.getTimeInMillis();
+    // ============ ADMIN ============
+    public void resetProductos() {
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.execSQL("DELETE FROM Productos");
+        db.execSQL("DELETE FROM sqlite_sequence WHERE name='Productos'");
+        db.close();
     }
 
-    private long endOfDayMillis(Date d) {
-        java.util.Calendar cal = java.util.Calendar.getInstance();
-        cal.setTime(d);
-        cal.set(java.util.Calendar.HOUR_OF_DAY, 23);
-        cal.set(java.util.Calendar.MINUTE, 59);
-        cal.set(java.util.Calendar.SECOND, 59);
-        cal.set(java.util.Calendar.MILLISECOND, 999);
-        return cal.getTimeInMillis();
-    }
-
-    // ===== Alertas =====
+    // ============ ALERTAS ============
 
     public long insertarAlerta(String titulo, String mensaje) {
         SQLiteDatabase db = this.getWritableDatabase();
@@ -176,7 +207,8 @@ public class DBHelper extends SQLiteOpenHelper {
         ArrayList<String[]> list = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor c = db.rawQuery(
-                "SELECT id, titulo, mensaje, creado_en FROM Alertas ORDER BY creado_en DESC", null
+                "SELECT id, titulo, mensaje, creado_en FROM Alertas " +
+                        "ORDER BY creado_en DESC", null
         );
         while (c.moveToNext()) {
             list.add(new String[] {
@@ -215,14 +247,16 @@ public class DBHelper extends SQLiteOpenHelper {
         db.close();
     }
 
-    // ===== Ventas =====
+    // ============ VENTAS ============
 
     /** Versión TRANSACCIONAL: usa una conexión existente (NO abre/NO cierra). */
     public long insertarVenta(SQLiteDatabase db, int idUsuario, String direccionEnvio) {
+        NowPair now = nowUtc(); // MISMO instante para ambas columnas
         android.content.ContentValues v = new android.content.ContentValues();
         v.put("id_usuario", idUsuario);
         v.put("direccion_envio", direccionEnvio);
-        v.put("fecha_venta_millis", System.currentTimeMillis());
+        v.put("fecha_venta", now.isoUtc);
+        v.put("fecha_venta_millis", now.epochMs);
         return db.insert("Ventas", null, v);
     }
 
@@ -231,10 +265,12 @@ public class DBHelper extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getWritableDatabase();
         long id;
         try {
+            NowPair now = nowUtc();
             android.content.ContentValues v = new android.content.ContentValues();
             v.put("id_usuario", idUsuario);
             v.put("direccion_envio", direccionEnvio);
-            v.put("fecha_venta_millis", System.currentTimeMillis());
+            v.put("fecha_venta", now.isoUtc);
+            v.put("fecha_venta_millis", now.epochMs);
             id = db.insert("Ventas", null, v);
         } finally {
             db.close();
@@ -298,7 +334,7 @@ public class DBHelper extends SQLiteOpenHelper {
         return total;
     }
 
-    // ===== Usuarios =====
+    // ============ USUARIOS ============
 
     public int validarUsuario(String correo, String contrasena) {
         SQLiteDatabase db = this.getReadableDatabase();

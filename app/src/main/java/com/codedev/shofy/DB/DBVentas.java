@@ -1,3 +1,4 @@
+// DBVentas.java
 package com.codedev.shofy.DB;
 
 import android.content.ContentValues;
@@ -10,10 +11,13 @@ import com.codedev.shofy.models.CompraDetalle;
 import com.codedev.shofy.models.CompraResumen;
 import com.codedev.shofy.models.ItemCarrito;
 import com.codedev.shofy.models.Producto;
-import com.codedev.shofy.utils.NotificationUtils; // ✅ NEW
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.TimeZone;
 
 public class DBVentas extends DBHelper {
     private final Context context;
@@ -23,15 +27,30 @@ public class DBVentas extends DBHelper {
         this.context = context;
     }
 
+    // ========= UTIL TIEMPO =========
+    private static String isoUtcNow(long ms) {
+        SimpleDateFormat f = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
+        f.setTimeZone(TimeZone.getTimeZone("UTC"));
+        return f.format(new java.util.Date(ms));
+    }
+
     /** REGISTRA UNA VENTA con sus detalles. Guarda en precio_venta el PRECIO UNITARIO con IVA. */
     public long registrarVenta(int idUsuario, List<ItemCarrito> items) {
         long idVenta = -1;
         SQLiteDatabase db = this.getWritableDatabase();
         db.beginTransaction();
         try {
+            // MISMO instante para ambas columnas
+            long nowMs = System.currentTimeMillis();
+            String nowIso = isoUtcNow(nowMs);
+
             // Cabecera
             ContentValues ventaValues = new ContentValues();
-            ventaValues.put("id_usuario", idUsuario); // fecha_venta = DEFAULT CURRENT_TIMESTAMP
+            ventaValues.put("id_usuario", idUsuario);
+            ventaValues.put("fecha_venta", nowIso);                // ISO-8601 UTC
+            ventaValues.put("fecha_venta_millis", nowMs);          // epoch ms
+            // Si tienes direccion_envio, añade: ventaValues.put("direccion_envio", direccion);
+
             idVenta = db.insertOrThrow("Ventas", null, ventaValues);
 
             // Detalles
@@ -53,11 +72,11 @@ public class DBVentas extends DBHelper {
                     d.put("precio_venta", precioUnitFinal);
                     db.insertOrThrow("DetalleVentas", null, d);
 
-                    // ✅ DESCONTAR STOCK dentro de la MISMA transacción
-                    db.execSQL("UPDATE Productos " +
-                                    "SET cantidad_actual = cantidad_actual - ? " +
-                                    "WHERE id = ?",
-                            new Object[]{cantidad, idProducto});
+                    // Descontar stock en la misma transacción
+                    db.execSQL(
+                            "UPDATE Productos SET cantidad_actual = cantidad_actual - ? WHERE id = ?",
+                            new Object[]{cantidad, idProducto}
+                    );
                 }
             }
 
@@ -66,31 +85,28 @@ public class DBVentas extends DBHelper {
             e.printStackTrace();
             idVenta = -1;
         } finally {
-            db.endTransaction();
+            try { db.endTransaction(); } catch (Exception ignored) {}
             db.close();
         }
 
-        // ✅ POST-COMMIT: notificar SOLO productos de esta venta que quedaron <= mínimo
-        // POST-COMMIT
+        // POST-COMMIT: notificar bajo stock (solo si hay admin logueado)
         try {
             if (idVenta != -1 && isAdminLoggedIn(context) && items != null) {
                 DBProductos dbp = new DBProductos(context);
-                java.util.HashSet<Integer> ids = new java.util.HashSet<>();
+                HashSet<Integer> ids = new HashSet<>();
                 for (ItemCarrito it : items) {
                     if (it != null && it.getProducto() != null) ids.add(it.getProducto().getId());
                 }
                 for (Integer idProd : ids) {
                     if (dbp.productoEstaBajoMinimo(idProd)) {
                         Producto p = dbp.getProductoById(idProd);
-                        if (p != null) com.codedev.shofy.utils.NotificationUtils.notifyLowStockSingle(context, p); // 👈
+                        if (p != null) com.codedev.shofy.utils.NotificationUtils.notifyLowStockSingle(context, p);
                     }
                 }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-
 
         return idVenta;
     }
@@ -105,7 +121,43 @@ public class DBVentas extends DBHelper {
         return 0.10;
     }
 
-    /** LISTA COMPRAS con total + un producto ejemplo, filtrando por rango (ISO). */
+    // ========= LISTADOS =========
+
+    /** NUEVO: LISTA COMPRAS por rango en millis (UTC). Empata con tu ComprasAdmin. */
+    public ArrayList<CompraResumen> listarComprasResumenRangoMillis(long desdeMs, long hastaMs) {
+        ArrayList<CompraResumen> lista = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+
+        Cursor c = db.rawQuery(
+                "SELECT v.id, v.id_usuario, v.fecha_venta_millis, " +
+                        "IFNULL(u.nombre,'') AS cliente, " +
+                        "SUM(d.cantidad_vendida * d.precio_venta) AS total " +
+                        "FROM Ventas v " +
+                        "JOIN DetalleVentas d ON d.id_venta = v.id " +
+                        "LEFT JOIN Usuarios u ON u.id = v.id_usuario " +
+                        "WHERE v.fecha_venta_millis BETWEEN ? AND ? " +
+                        "GROUP BY v.id " +
+                        "ORDER BY v.fecha_venta_millis DESC",
+                new String[]{ String.valueOf(desdeMs), String.valueOf(hastaMs) }
+        );
+
+        while (c.moveToNext()) {
+            int idVenta = c.getInt(0);
+            int idUsuario = c.getInt(1);
+            long fechaMs = c.getLong(2);
+            String cliente = c.getString(3);
+            double total = c.getDouble(4);
+
+            // Modelo esperado por tu ComprasAdmin/Adapter
+            lista.add(new CompraResumen(idVenta, idUsuario, fechaMs, cliente, total));
+        }
+        c.close();
+        db.close();
+        return lista;
+    }
+
+    /** LEGADO: filtrado con strings ISO. Mejor usa listarComprasResumenRangoMillis(). */
+    @Deprecated
     public ArrayList<CompraResumen> listarComprasResumenRango(String desdeIso, String hastaIso) {
         ArrayList<CompraResumen> lista = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
@@ -113,11 +165,9 @@ public class DBVentas extends DBHelper {
         String sql =
                 "SELECT v.id, v.fecha_venta, " +
                         "       IFNULL(SUM(d.cantidad_vendida * d.precio_venta), 0) AS total, " +
-                        "       (SELECT p.nombre " +
-                        "          FROM DetalleVentas d2 " +
-                        "          JOIN Productos p ON p.id = d2.id_producto " +
-                        "         WHERE d2.id_venta = v.id " +
-                        "         LIMIT 1) AS producto_ejemplo, " +
+                        "       (SELECT p.nombre FROM DetalleVentas d2 " +
+                        "           JOIN Productos p ON p.id = d2.id_producto " +
+                        "          WHERE d2.id_venta = v.id LIMIT 1) AS producto_ejemplo, " +
                         "       COUNT(DISTINCT d.id_producto) AS prod_distintos " +
                         "FROM Ventas v " +
                         "LEFT JOIN DetalleVentas d ON d.id_venta = v.id " +
@@ -126,73 +176,67 @@ public class DBVentas extends DBHelper {
                         "ORDER BY datetime(v.fecha_venta) DESC";
 
         Cursor c = db.rawQuery(sql, new String[]{desdeIso, hastaIso});
-        if (c != null) {
-            while (c.moveToNext()) {
-                int id = c.getInt(0);
-                String fecha = c.getString(1);
-                double total = c.getDouble(2);
-                String productoEj = c.getString(3);
-                int distintos = c.getInt(4);
-                lista.add(new CompraResumen(
-                        id,
-                        fecha,
-                        total,
-                        productoEj != null ? productoEj : "(sin detalle)",
-                        distintos
-                ));
-            }
-            c.close();
+        while (c.moveToNext()) {
+            // Si alguien aún llama a este método, devuelves algo básico
+            int id = c.getInt(0);
+            String fecha = c.getString(1);
+            double total = c.getDouble(2);
+            // cliente y idUsuario no están en este select; marcamos genérico
+            lista.add(new CompraResumen(id, 0, /*fechaMs*/ 0L, "(ver detalle)", total));
         }
+        c.close();
         db.close();
         return lista;
     }
 
-    /** DETALLE de una venta para el ticket (cabecera + líneas). */
+    /** DETALLE de una venta para el ticket (cabecera + líneas). Devuelve fechaMillis. */
     public CompraDetalle obtenerDetalleVenta(int idVenta) {
         SQLiteDatabase db = this.getReadableDatabase();
         CompraDetalle detalle = null;
 
-        // Cabecera con total ya calculado
-        String sqlVenta =
-                "SELECT v.id, v.fecha_venta, u.nombre, u.correo, " +
-                        "       IFNULL(SUM(d.cantidad_vendida * d.precio_venta), 0) AS total " +
+        // Cabecera (traemos fecha_venta_millis + cliente)
+        Cursor cVenta = db.rawQuery(
+                "SELECT v.id, v.id_usuario, v.fecha_venta_millis, IFNULL(u.nombre,'') AS cliente " +
                         "FROM Ventas v " +
-                        "JOIN Usuarios u ON u.id = v.id_usuario " +
-                        "LEFT JOIN DetalleVentas d ON d.id_venta = v.id " +
-                        "WHERE v.id = ? " +
-                        "GROUP BY v.id, v.fecha_venta, u.nombre, u.correo";
+                        "LEFT JOIN Usuarios u ON u.id = v.id_usuario " +
+                        "WHERE v.id = ? LIMIT 1",
+                new String[]{ String.valueOf(idVenta) }
+        );
 
-        Cursor cVenta = db.rawQuery(sqlVenta, new String[]{String.valueOf(idVenta)});
         if (cVenta.moveToFirst()) {
-            int id = cVenta.getInt(0);
-            String fecha = cVenta.getString(1);
-            String cliente = cVenta.getString(2);
-            String correo = cVenta.getString(3);
-            double total = cVenta.getDouble(4);
-            detalle = new CompraDetalle(id, fecha, cliente, correo, total);
+            long fechaMs = cVenta.getLong(2);
+            String cliente = cVenta.getString(3);
+            detalle = new CompraDetalle(idVenta, fechaMs, cliente);
         }
         cVenta.close();
 
-        if (detalle != null) {
-            // Líneas
-            String sqlProd =
-                    "SELECT p.nombre, d.cantidad_vendida, d.precio_venta " +
-                            "FROM DetalleVentas d " +
-                            "JOIN Productos p ON p.id = d.id_producto " +
-                            "WHERE d.id_venta = ?";
-
-            Cursor cProd = db.rawQuery(sqlProd, new String[]{String.valueOf(idVenta)});
-            while (cProd.moveToNext()) {
-                String nombre = cProd.getString(0);
-                int cantidad = cProd.getInt(1);
-                double precioUnit = cProd.getDouble(2);
-                detalle.getProductos().add(
-                        new CompraDetalle.ProductoLinea(nombre, cantidad, precioUnit)
-                );
-            }
-            cProd.close();
+        if (detalle == null) {
+            db.close();
+            return null;
         }
+
+        // Líneas
+        Cursor cProd = db.rawQuery(
+                "SELECT p.nombre, d.cantidad_vendida, d.precio_venta " +
+                        "FROM DetalleVentas d " +
+                        "JOIN Productos p ON p.id = d.id_producto " +
+                        "WHERE d.id_venta = ?",
+                new String[]{ String.valueOf(idVenta) }
+        );
+        double total = 0.0;
+        while (cProd.moveToNext()) {
+            String nombre = cProd.getString(0);
+            int cantidad = cProd.getInt(1);
+            double precioUnit = cProd.getDouble(2);
+            detalle.getProductos().add(
+                    new CompraDetalle.ProductoLinea(nombre, cantidad, precioUnit)
+            );
+            total += cantidad * precioUnit;
+        }
+        cProd.close();
         db.close();
+
+        detalle.setTotal(total);
         return detalle;
     }
 

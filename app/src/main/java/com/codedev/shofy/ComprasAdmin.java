@@ -1,3 +1,4 @@
+// ComprasAdmin.java
 package com.codedev.shofy;
 
 import android.app.DatePickerDialog;
@@ -6,6 +7,7 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.pdf.PdfDocument;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -29,9 +31,14 @@ import com.codedev.shofy.models.CompraResumen;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.Locale;
+import java.util.TimeZone;
 
 public class ComprasAdmin extends Fragment {
 
@@ -40,12 +47,11 @@ public class ComprasAdmin extends Fragment {
     private EditText etDesde, etHasta;
     private TextView btnFiltrar;
 
-    // Chips de periodo rápido
     private TextView chipHoy, chipSemana, chipMes;
 
-    // Rango en ISO para SQLite
-    private String desdeIso = "1970-01-01 00:00:00";
-    private String hastaIso = "2100-12-31 23:59:59";
+    // Ahora usamos milisegundos (UTC) para el filtro
+    private long desdeMs = 0L;
+    private long hastaMs = Long.MAX_VALUE;
 
     public ComprasAdmin() { }
 
@@ -56,15 +62,14 @@ public class ComprasAdmin extends Fragment {
         View v = inflater.inflate(R.layout.fragment_compras_admin, container, false);
 
         recycler = v.findViewById(R.id.recyclerCompras);
-        recycler.setLayoutManager(new LinearLayoutManager(getContext())); // 1 columna
+        recycler.setLayoutManager(new LinearLayoutManager(getContext()));
 
         adapter = new ComprasAdapter(
                 new ArrayList<>(),
                 compra -> {
-                    // Click en la tarjeta completa (si quieres abrir detalle)
                     Toast.makeText(getContext(), "Compra #" + compra.getIdVenta(), Toast.LENGTH_SHORT).show();
                 },
-                compra -> { // Click en el cuadrito verde "PDF"
+                compra -> {
                     DBVentas db = new DBVentas(getContext());
                     CompraDetalle detalle = db.obtenerDetalleVenta(compra.getIdVenta());
                     if (detalle == null) {
@@ -91,34 +96,29 @@ public class ComprasAdmin extends Fragment {
         etHasta = v.findViewById(R.id.etHasta);
         btnFiltrar = v.findViewById(R.id.btnFiltrar);
 
-        // Chips
         chipHoy = v.findViewById(R.id.chipHoy);
         chipSemana = v.findViewById(R.id.chipSemana);
         chipMes = v.findViewById(R.id.chipMes);
 
-        // DatePickers
+        // DatePickers → convierten a rango en millis (UTC) preservando tu día local
         etDesde.setOnClickListener(view -> abrirDatePicker(true));
         etHasta.setOnClickListener(view -> abrirDatePicker(false));
         btnFiltrar.setOnClickListener(view -> cargarCompras());
 
-        // Listeners chips
+        // Chips rápidos
         View[] chips = new View[]{chipHoy, chipSemana, chipMes};
         Runnable clearChips = () -> {
-            if (chips[0] == null) return;
-            for (View chip : chips) {
-                if (chip != null) chip.setBackgroundResource(R.drawable.bg_category);
-            }
+            for (View chip : chips) if (chip != null) chip.setBackgroundResource(R.drawable.bg_category);
         };
 
         if (chipHoy != null) {
             chipHoy.setOnClickListener(view -> {
                 clearChips.run();
                 view.setBackgroundResource(R.drawable.bg_category_selected);
-                String[] rango = RangosFecha.hoy();
-                desdeIso = rango[0];
-                hastaIso = rango[1];
-                etDesde.setText(RangosFecha.pretty(desdeIso));
-                etHasta.setText(RangosFecha.pretty(hastaIso));
+                long[] r = RangosFecha.hoy();
+                desdeMs = r[0]; hastaMs = r[1];
+                etDesde.setText(RangosFecha.prettyDia(desdeMs));
+                etHasta.setText(RangosFecha.prettyDia(hastaMs));
                 cargarCompras();
             });
         }
@@ -127,11 +127,10 @@ public class ComprasAdmin extends Fragment {
             chipSemana.setOnClickListener(view -> {
                 clearChips.run();
                 view.setBackgroundResource(R.drawable.bg_category_selected);
-                String[] rango = RangosFecha.semanaActual();
-                desdeIso = rango[0];
-                hastaIso = rango[1];
-                etDesde.setText(RangosFecha.pretty(desdeIso));
-                etHasta.setText(RangosFecha.pretty(hastaIso));
+                long[] r = RangosFecha.semanaActual();
+                desdeMs = r[0]; hastaMs = r[1];
+                etDesde.setText(RangosFecha.prettyDia(desdeMs));
+                etHasta.setText(RangosFecha.prettyDia(hastaMs));
                 cargarCompras();
             });
         }
@@ -140,34 +139,44 @@ public class ComprasAdmin extends Fragment {
             chipMes.setOnClickListener(view -> {
                 clearChips.run();
                 view.setBackgroundResource(R.drawable.bg_category_selected);
-                String[] rango = RangosFecha.mesActual();
-                desdeIso = rango[0];
-                hastaIso = rango[1];
-                etDesde.setText(RangosFecha.pretty(desdeIso));
-                etHasta.setText(RangosFecha.pretty(hastaIso));
+                long[] r = RangosFecha.mesActual();
+                desdeMs = r[0]; hastaMs = r[1];
+                etDesde.setText(RangosFecha.prettyDia(desdeMs));
+                etHasta.setText(RangosFecha.prettyDia(hastaMs));
                 cargarCompras();
             });
         }
 
-        // Carga inicial
+        // Carga inicial: hoy
+        long[] r0 = RangosFecha.hoy();
+        desdeMs = r0[0]; hastaMs = r0[1];
+        etDesde.setText(RangosFecha.prettyDia(desdeMs));
+        etHasta.setText(RangosFecha.prettyDia(hastaMs));
         cargarCompras();
+
         return v;
     }
 
     private void abrirDatePicker(boolean esDesde) {
-        final Calendar cal = Calendar.getInstance();
+        final Calendar cal = Calendar.getInstance(); // zona local del dispositivo
         DatePickerDialog dp = new DatePickerDialog(
                 getContext(),
                 (picker, y, m, d) -> {
-                    String ddmmyy = String.format(Locale.getDefault(), "%02d/%02d/%04d", d, m + 1, y);
-                    String isoIni = String.format(Locale.getDefault(), "%04d-%02d-%02d 00:00:00", y, m + 1, d);
-                    String isoFin = String.format(Locale.getDefault(), "%04d-%02d-%02d 23:59:59", y, m + 1, d);
+                    // Al seleccionar, generamos inicio/fin de día local en millis (UTC)
+                    Calendar c1 = Calendar.getInstance();
+                    c1.set(Calendar.YEAR, y);
+                    c1.set(Calendar.MONTH, m);
+                    c1.set(Calendar.DAY_OF_MONTH, d);
+                    RangosFecha.zero(c1);
+                    Calendar c2 = (Calendar) c1.clone();
+                    RangosFecha.endOfDay(c2);
+
                     if (esDesde) {
-                        etDesde.setText(ddmmyy);
-                        desdeIso = isoIni;
+                        desdeMs = c1.getTimeInMillis();
+                        etDesde.setText(RangosFecha.prettyDia(desdeMs));
                     } else {
-                        etHasta.setText(ddmmyy);
-                        hastaIso = isoFin;
+                        hastaMs = c2.getTimeInMillis();
+                        etHasta.setText(RangosFecha.prettyDia(hastaMs));
                     }
                 },
                 cal.get(Calendar.YEAR),
@@ -177,9 +186,11 @@ public class ComprasAdmin extends Fragment {
         dp.show();
     }
 
+
     private void cargarCompras() {
         DBVentas db = new DBVentas(getContext());
-        ArrayList<CompraResumen> lista = db.listarComprasResumenRango(desdeIso, hastaIso);
+        // NUEVO: consulta por rango en millis, no por strings
+        ArrayList<CompraResumen> lista = db.listarComprasResumenRangoMillis(desdeMs, hastaMs);
         adapter.actualizar(lista);
     }
 
@@ -189,7 +200,6 @@ public class ComprasAdmin extends Fragment {
         Paint paint = new Paint();
         Paint titlePaint = new Paint();
 
-        // Tamaño tipo recibo
         PdfDocument.PageInfo pageInfo = new PdfDocument.PageInfo.Builder(300, 600, 1).create();
         PdfDocument.Page page = pdf.startPage(pageInfo);
         Canvas canvas = page.getCanvas();
@@ -201,7 +211,11 @@ public class ComprasAdmin extends Fragment {
         paint.setTextSize(10);
         int y = 44;
         canvas.drawText("Venta #" + detalle.getIdVenta(), 10, y, paint); y += 16;
-        canvas.drawText("Fecha: " + detalle.getFecha(), 10, y, paint); y += 16;
+
+        // IMPORTANTE: formatear millis a hora local (México) para el PDF
+        String fechaLocal = TimeFmt.formatLocal(detalle.getFechaMillis());
+        canvas.drawText("Fecha: " + fechaLocal, 10, y, paint); y += 16;
+
         if (detalle.getCliente() != null && !detalle.getCliente().isEmpty()) {
             canvas.drawText("Cliente: " + detalle.getCliente(), 10, y, paint); y += 16;
         } else { y += 4; }
@@ -237,47 +251,58 @@ public class ComprasAdmin extends Fragment {
         return out;
     }
 
-    // ===== Helpers de rangos (integrados) =====
+    // ===== Helpers =====
+    public static final class TimeFmt {
+        private static final String Z_MX = "America/Mexico_City";
+
+        public static String formatLocal(long epochMs) {
+            if (Build.VERSION.SDK_INT >= 26) {
+                DateTimeFormatter fmt = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+                        .withZone(ZoneId.of(Z_MX));
+                return fmt.format(Instant.ofEpochMilli(epochMs));
+            } else {
+                java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
+                f.setTimeZone(TimeZone.getTimeZone(Z_MX));
+                return f.format(new Date(epochMs));
+            }
+        }
+    }
+
     public static class RangosFecha {
-        public static String[] hoy() {
-            Calendar c = Calendar.getInstance();
+        public static long[] hoy() {
+            Calendar c = Calendar.getInstance(); // zona local
             return diaCompleto(c);
         }
-        public static String[] semanaActual() {
+        public static long[] semanaActual() {
             Calendar c1 = Calendar.getInstance();
             c1.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
             zero(c1);
             Calendar c2 = (Calendar) c1.clone();
             c2.add(Calendar.DAY_OF_YEAR, 6);
             endOfDay(c2);
-            return new String[]{toIso(c1), toIso(c2)};
+            return new long[]{c1.getTimeInMillis(), c2.getTimeInMillis()};
         }
-        public static String[] mesActual() {
+        public static long[] mesActual() {
             Calendar c1 = Calendar.getInstance();
             c1.set(Calendar.DAY_OF_MONTH, 1);
             zero(c1);
             Calendar c2 = (Calendar) c1.clone();
             c2.set(Calendar.DAY_OF_MONTH, c2.getActualMaximum(Calendar.DAY_OF_MONTH));
             endOfDay(c2);
-            return new String[]{toIso(c1), toIso(c2)};
+            return new long[]{c1.getTimeInMillis(), c2.getTimeInMillis()};
         }
-        public static String pretty(String iso) {
-            try {
-                java.text.SimpleDateFormat in = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
-                java.text.SimpleDateFormat out = new java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
-                return out.format(in.parse(iso));
-            } catch (Exception e) { return iso; }
-        }
-        private static String[] diaCompleto(Calendar c) {
+        private static long[] diaCompleto(Calendar c) {
             Calendar from = (Calendar) c.clone(); zero(from);
-            Calendar to = (Calendar) c.clone();   endOfDay(to);
-            return new String[]{toIso(from), toIso(to)};
+            Calendar to   = (Calendar) c.clone(); endOfDay(to);
+            return new long[]{from.getTimeInMillis(), to.getTimeInMillis()};
         }
         private static void zero(Calendar c) { c.set(Calendar.HOUR_OF_DAY,0); c.set(Calendar.MINUTE,0); c.set(Calendar.SECOND,0); c.set(Calendar.MILLISECOND,0); }
         private static void endOfDay(Calendar c) { c.set(Calendar.HOUR_OF_DAY,23); c.set(Calendar.MINUTE,59); c.set(Calendar.SECOND,59); c.set(Calendar.MILLISECOND,999); }
-        private static String toIso(Calendar c) {
-            java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
-            return f.format(c.getTime());
+
+        public static String prettyDia(long epochMs) {
+            java.text.SimpleDateFormat out = new java.text.SimpleDateFormat("dd/MM/yyyy", Locale.getDefault());
+            out.setTimeZone(TimeZone.getTimeZone("America/Mexico_City"));
+            return out.format(new Date(epochMs));
         }
     }
 }

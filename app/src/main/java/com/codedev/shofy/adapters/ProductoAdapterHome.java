@@ -12,7 +12,6 @@ import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.RecyclerView;
 
-import com.codedev.shofy.DetalladoProducto;
 import com.codedev.shofy.R;
 import com.codedev.shofy.models.Producto;
 
@@ -45,6 +44,9 @@ public class ProductoAdapterHome extends RecyclerView.Adapter<ProductoAdapterHom
         holder.nombre.setText(producto.getNombre());
         holder.precio.setText("$" + producto.getPrecioBase());
 
+        // Mostrar unidades disponibles
+        holder.unidades.setText("Unidades: " + producto.getCantidad_actual());
+
         int iconoTipo = obtenerIconoPorTipo(producto.getTipo());
         holder.imagen.setImageResource(iconoTipo);
 
@@ -54,8 +56,6 @@ public class ProductoAdapterHome extends RecyclerView.Adapter<ProductoAdapterHom
             args.putSerializable("producto", producto);
             Navigation.findNavController(v).navigate(R.id.action_nav_home_to_detalladoProducto, args);
         });
-
-
     }
 
     @Override
@@ -101,13 +101,14 @@ public class ProductoAdapterHome extends RecyclerView.Adapter<ProductoAdapterHom
 
     // ViewHolder
     public static class ProductoViewHolder extends RecyclerView.ViewHolder {
-        TextView nombre, precio;
+        TextView nombre, precio, unidades;
         ImageView imagen;
 
         public ProductoViewHolder(@NonNull View itemView) {
             super(itemView);
             nombre = itemView.findViewById(R.id.txtNombre);
             precio = itemView.findViewById(R.id.txtPrecio);
+            unidades = itemView.findViewById(R.id.txtUnidades); // Nuevo TextView
             imagen = itemView.findViewById(R.id.imgProducto);
         }
     }
